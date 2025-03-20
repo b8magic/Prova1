@@ -23,7 +23,7 @@ jobs:
         run: |
           xcodebuild \
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive -scheme HeaderViewer \
+            archive -scheme Monte Ore \
             -destination 'generic/platform=iOS' \
             -archivePath ios_archive \
             -quiet
@@ -31,7 +31,7 @@ jobs:
       - name: Package iOS app
         run: |
           mv ios_archive.xcarchive/Products/Applications Payload
-          zip -yqr HeaderViewer.ipa Payload
+          zip -yqr Monte Ore.ipa Payload
 
           - name: Upload a Build Artifact
             uses: actions/upload-artifact@v4
