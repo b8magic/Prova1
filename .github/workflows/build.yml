@@ -41,10 +41,14 @@ jobs:
 
       - name: Package iOS app
         run: |
-          # Move the built app into a Payload folder (required for IPA structure)
-          mv ios_archive.xcarchive/Products/Applications/Monte\ Ore.app Payload
-          # Create the IPA by zipping the Payload folder
-          cd Payload && zip -yqr "Monte Ore.ipa" "Monte Ore.app"
+          # Create a Payload folder if it doesn't exist
+          mkdir -p Payload
+          # Copy the app bundle into Payload (using quotes for names with spaces)
+          cp -R "ios_archive.xcarchive/Products/Applications/Monte Ore.app" Payload/
+          # Change directory to Payload and create the IPA
+          cd Payload
+          zip -yqr "../Monte Ore.ipa" "Monte Ore.app"
+
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
