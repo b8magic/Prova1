@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 
 // MARK: - App Icon Note
-// To add an icon, convert your JPEG to the required sizes and add them into your Assets.xcassets.
+// To add an icon, convert your JPEG to the required sizes and add them into your Assets.xcassets
 // Then, in your Xcode project settings under "General" -> "App Icons and Launch Images",
 // select the asset catalog you created for your icon. It is not possible to load an arbitrary JPEG at runtime.
 
