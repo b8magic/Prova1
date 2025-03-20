@@ -25,10 +25,26 @@ jobs:
             -archivePath ios_archive \
             -quiet
 
+      # This step ensures that any JPEG icons (stored in Assets/Icons) are copied into
+      # the AppIcon asset catalog of your built app.
+      - name: Ensure JPEG icons are included
+        run: |
+          # Update the source path if your JPEG icons are located elsewhere.
+          ICON_SOURCE="Assets/Icons"
+          APP_ICON_DEST="ios_archive.xcarchive/Products/Applications/Monte Ore.app/Assets.xcassets/AppIcon.appiconset"
+          if [ -d "$ICON_SOURCE" ]; then
+            echo "Copying JPEG icons from $ICON_SOURCE to $APP_ICON_DEST"
+            cp -R "$ICON_SOURCE" "$APP_ICON_DEST"
+          else
+            echo "Icon source folder $ICON_SOURCE does not exist. Skipping copy step."
+          fi
+
       - name: Package iOS app
         run: |
-          mv ios_archive.xcarchive/Products/Applications Payload
-          zip -yqr "Monte Ore.ipa" Payload
+          # Move the built app into a Payload folder (required for IPA structure)
+          mv ios_archive.xcarchive/Products/Applications/Monte\ Ore.app Payload
+          # Create the IPA by zipping the Payload folder
+          cd Payload && zip -yqr "Monte Ore.ipa" "Monte Ore.app"
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
