@@ -48,7 +48,7 @@ jobs:
           cd Payload
           zip -yqr "../Monte Ore.ipa" "Monte Ore.app"
 
-      - name: Debug: List IPA File
+      - name: Debug:List IPA File
         run: ls -al ..
 
       - name: Upload a Build Artifact
