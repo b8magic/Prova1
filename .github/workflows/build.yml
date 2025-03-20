@@ -27,6 +27,9 @@ jobs:
             -archivePath ios_archive \
             -quiet
 
+      - name: Debug: List App Bundle
+        run: ls -al ios_archive.xcarchive/Products/Applications
+
       # This step ensures that any JPEG icons (assumed to be in MonteOre/Assets/Icons) are copied into the app bundle.
       - name: Ensure JPEG icons are included
         run: |
@@ -46,7 +49,10 @@ jobs:
           cd Payload
           zip -yqr "../Monte Ore.ipa" "Monte Ore.app"
 
+      - name: Debug: List IPA File
+        run: ls -al "../"  # Check if Monte Ore.ipa is in the parent folder
+
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          path: Monte Ore.ipa
+          path: "Monte Ore.ipa"
