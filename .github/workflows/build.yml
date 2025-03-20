@@ -27,7 +27,7 @@ jobs:
             -archivePath ios_archive \
             -quiet
 
-      - name: Debug:List App Bundle
+      - name: Debug: List App Bundle
         run: ls -al ios_archive.xcarchive/Products/Applications
 
       - name: Ensure JPEG icons are included
@@ -48,7 +48,7 @@ jobs:
           cd Payload
           zip -yqr "../Monte Ore.ipa" "Monte Ore.app"
 
-      - name: Debug:List IPA File
+      - name: Debug: List IPA File
         run: ls -al ..
 
       - name: Upload a Build Artifact
