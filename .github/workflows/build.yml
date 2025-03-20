@@ -12,7 +12,7 @@ jobs:
     # needed to be able to create a Release
     permissions:
       contents: write
-    runs-on: macos-15
+    runs-on: macos-15.2
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
