@@ -32,7 +32,7 @@ jobs:
 
       - name: Ensure JPEG icons are included
         run: |
-          ICON_SOURCE="MonteOre/Assets/Icons"
+          ICON_SOURCE="MonteOre/Assets.xcassets/AppIcon.appiconset"
           APP_ICON_DEST="ios_archive.xcarchive/Products/Applications/Monte Ore.app/Assets.xcassets/AppIcon.appiconset"
           if [ -d "$ICON_SOURCE" ]; then
             echo "Copying JPEG icons from $ICON_SOURCE to $APP_ICON_DEST"
