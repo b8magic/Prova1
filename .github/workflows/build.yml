@@ -1,5 +1,3 @@
-# Based on
-# https://github.com/theos/sdks/blob/ca52092/.github/workflows/release.yml
 name: Release
 
 on:
@@ -9,7 +7,6 @@ on:
 
 jobs:
   release:
-    # needed to be able to create a Release
     permissions:
       contents: write
     runs-on: macos-15
@@ -23,7 +20,7 @@ jobs:
         run: |
           xcodebuild \
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive -scheme Monte Ore \
+            archive -scheme "Monte Ore" \
             -destination 'generic/platform=iOS' \
             -archivePath ios_archive \
             -quiet
@@ -31,9 +28,9 @@ jobs:
       - name: Package iOS app
         run: |
           mv ios_archive.xcarchive/Products/Applications Payload
-          zip -yqr Monte Ore.ipa Payload
+          zip -yqr "Monte Ore.ipa" Payload
 
-          - name: Upload a Build Artifact
-            uses: actions/upload-artifact@v4
-            with:
-              path: package/*.ipa
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: Monte Ore.ipa
