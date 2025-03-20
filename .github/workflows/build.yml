@@ -16,20 +16,23 @@ jobs:
         with:
           submodules: recursive
 
+      # Adjust the working-directory below to match where your Xcode project is located.
       - name: Archive iOS app
+        working-directory: MonteOre  # ← Update this folder if your project isn't in "MonteOre"
         run: |
           xcodebuild \
+            -project "Monte Ore.xcodeproj" \
+            -scheme "Monte Ore" \
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive -scheme "Monte Ore" \
+            archive \
             -destination 'generic/platform=iOS' \
-            -archivePath ios_archive \
+            -archivePath ../ios_archive \
             -quiet
 
-      # This step ensures that any JPEG icons (stored in Assets/Icons) are copied into
-      # the AppIcon asset catalog of your built app.
+      # This step ensures that any JPEG icons (assumed to be in Assets/Icons at the repository root)
+      # are copied into the app's asset catalog. Adjust the paths as needed.
       - name: Ensure JPEG icons are included
         run: |
-          # Update the source path if your JPEG icons are located elsewhere.
           ICON_SOURCE="Assets/Icons"
           APP_ICON_DEST="ios_archive.xcarchive/Products/Applications/Monte Ore.app/Assets.xcassets/AppIcon.appiconset"
           if [ -d "$ICON_SOURCE" ]; then
@@ -41,14 +44,10 @@ jobs:
 
       - name: Package iOS app
         run: |
-          # Create a Payload folder if it doesn't exist
           mkdir -p Payload
-          # Copy the app bundle into Payload (using quotes for names with spaces)
           cp -R "ios_archive.xcarchive/Products/Applications/Monte Ore.app" Payload/
-          # Change directory to Payload and create the IPA
           cd Payload
           zip -yqr "../Monte Ore.ipa" "Monte Ore.app"
-
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
