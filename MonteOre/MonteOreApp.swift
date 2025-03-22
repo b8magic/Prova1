@@ -412,11 +412,11 @@ struct PopupView: View {
 struct CurvedArrowRight: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        // Disegna una curva che parte dalla sinistra verso destra con una freccia
+        // Curva da sinistra verso destra
         path.move(to: CGPoint(x: rect.minX, y: rect.midY))
         path.addQuadCurve(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10),
                           control: CGPoint(x: rect.midX, y: rect.minY))
-        // Aggiungi la freccia
+        // Aggiungi freccia
         path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - 20))
         path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
@@ -428,11 +428,11 @@ struct CurvedArrowRight: Shape {
 struct CurvedArrowLeft: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        // Disegna una curva da destra a sinistra
+        // Curva da destra verso sinistra
         path.move(to: CGPoint(x: rect.maxX, y: rect.midY))
         path.addQuadCurve(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10),
                           control: CGPoint(x: rect.midX, y: rect.minY))
-        // Aggiungi la freccia
+        // Aggiungi freccia
         path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.midY - 20))
         path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
@@ -441,63 +441,83 @@ struct CurvedArrowLeft: Shape {
     }
 }
 
-// MARK: - No Notes Prompt View (MODIFICA 3)
+// MARK: - NoNotesPromptView (MODIFICA 3)
+// Questa view viene mostrata se non esiste alcun progetto (currentProject == nil)
+// NOTA: Se c'è un progetto (anche senza note) la view principale mostra l'area note (vuota).
 struct NoNotesPromptView: View {
+    // Utilizziamo una binding per mostrare il popup medaglia
     @Binding var showPopup: Bool
+    @State private var showDropdown: Bool = false
     
     var body: some View {
         VStack(spacing: 16) {
-            // Il testo principale, in alto
+            // Testo in alto
             Text("Dai, datti da fare!")
                 .font(.custom("Permanent Marker", size: 36))
                 .bold()
                 .foregroundColor(.black)
                 .padding(.top, 20)
-                .padding(.bottom, 40)
-                .overlay(
-                    GeometryReader { geo in
-                        // Freccia sinistra (curvilinea) che parte dalla frase e punta verso Gestione Progetti
-                        CurvedArrowLeft()
-                            .stroke(Color.black, lineWidth: 2)
-                            .frame(width: geo.size.width * 0.8, height: 50)
-                            .offset(x: -geo.size.width * 0.3, y: geo.size.height + 10)
-                    }
-                )
+            // Freccia sinistra curvilinea posizionata con offset fissi
+            CurvedArrowLeft()
+                .stroke(Color.black, lineWidth: 2)
+                .frame(width: 150, height: 40)
+                .offset(x: -50, y: -10)
+            // Bottone "Non c'ho sbatti"
+            Button(action: {
+                withAnimation {
+                    showDropdown.toggle()
+                }
+            }) {
+                Text("Non c'ho sbatti")
+                    .font(.custom("Permanent Marker", size: 24))
+                    .bold()
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+            // Freccia destra curvilinea (fissa) che punta verso il bottone (ma non lo tocca)
+            CurvedArrowRight()
+                .stroke(Color.black, lineWidth: 2)
+                .frame(width: 150, height: 40)
+                .offset(x: 50, y: -10)
             
-            HStack {
-                Spacer()
-                Button(action: {
-                    withAnimation {
-                        // Mostra dropdown per "Non c'ho sbatti"
-                    }
-                }) {
-                    Text("Non c'ho sbatti")
+            if showDropdown {
+                VStack(spacing: 8) {
+                    Text("Frate, nemmeno io")
                         .font(.custom("Permanent Marker", size: 24))
                         .bold()
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(8)
-                }
-                .overlay(
-                    GeometryReader { geo in
-                        // Freccia destra (curvilinea) che parte dalla frase e punta al bottone senza toccarlo
-                        CurvedArrowRight()
-                            .stroke(Color.black, lineWidth: 2)
-                            .frame(width: geo.size.width * 1.2, height: 40)
-                            .offset(x: -geo.size.width * 0.8, y: -30)
+                        .foregroundColor(.black)
+                    Button(action: {
+                        withAnimation {
+                            showDropdown = false
+                            showPopup = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            withAnimation { showPopup = false }
+                        }
+                    }) {
+                        Text("Daje")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(8)
                     }
-                )
-                Spacer()
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(10)
             }
         }
         .padding()
     }
 }
 
-// MARK: - How It Works Dropdown (MODIFICA 1)
-// Questa view comparirà centrata sullo schermo
+// MARK: - HowItWorksDropdownView (MODIFICA 1)
+// Questa view comparirà centrata sullo schermo e utilizza un binding per mostrare il popup
 struct HowItWorksDropdownView: View {
+    @Binding var showPopup: Bool
     var body: some View {
         VStack(spacing: 16) {
             Text("Frate, ma è una minchiata.. smanetta un po'")
@@ -505,10 +525,11 @@ struct HowItWorksDropdownView: View {
                 .bold()
                 .foregroundColor(.black)
             Button(action: {
-                // Il bottone TOP chiude la tendina e mostra il popup
                 withAnimation {
-                    // La logica per chiudere il dropdown viene gestita nel chiamante
-                    NotificationCenter.default.post(name: NSNotification.Name("CloseHowItWorksDropdown"), object: nil)
+                    showPopup = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    withAnimation { showPopup = false }
                 }
             }) {
                 Text("TOP")
@@ -530,33 +551,33 @@ struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
     @State private var switchAlert: ActiveAlert? = nil
     @State private var showProjectManager: Bool = false
-    // Stato per il popup della NoNotesPromptView (MODIFICA 3)
-    @State private var showNoNotesPopup: Bool = false
+    // Stato per il popup della medaglia, usato sia in NoNotesPromptView che in HowItWorksDropdownView
+    @State private var showPopup: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
-            // Il prompt NoNotesPromptView compare solo se non esiste un progetto corrente oppure se non ha note
-            let showPrompt = (projectManager.currentProject == nil) || (projectManager.currentProject?.noteRows.isEmpty ?? true)
+            // Mostra il prompt solo se non esiste alcun progetto (currentProject == nil)
+            let showPrompt = projectManager.currentProject == nil
             
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
-                    
                     if showPrompt {
-                        NoNotesPromptView(showPopup: $showNoNotesPopup)
-                    }
-                    
-                    if let project = projectManager.currentProject, !project.noteRows.isEmpty {
-                        ScrollView {
-                            NoteView(project: project)
-                                .padding()
+                        NoNotesPromptView(showPopup: $showPopup)
+                    } else {
+                        // Anche se il progetto esiste ma senza note, si mostra comunque l'area note (vuota)
+                        if let project = projectManager.currentProject {
+                            ScrollView {
+                                NoteView(project: project)
+                                    .padding()
+                            }
+                            .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
+                                   height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(25)
+                            .clipped()
                         }
-                        .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
-                               height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(25)
-                        .clipped()
                     }
                     
                     Button(action: {
@@ -604,8 +625,9 @@ struct ContentView: View {
                     .padding(.bottom, isLandscape ? 0 : 30)
                 }
                 
-                if showNoNotesPopup {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Frate, fattelo venire lo sbatti\"")
+                // Popup per la medaglia, visibile se showPopup è true
+                if showPopup {
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"\(projectManager.currentProject != nil ? "Sbattimenti zero eh" : "Frate, fattelo venire lo sbatti")\"")
                         .transition(.scale)
                 }
             }
@@ -811,7 +833,8 @@ struct ProjectManagerView: View {
     // Stati per il pulsante "Come funziona l'app"
     @State private var showHowItWorksSecondButton: Bool = false
     @State private var showHowItWorksDropdown: Bool = false
-    
+    @State private var showPopup: Bool = false
+
     var body: some View {
         ZStack {
             NavigationView {
@@ -1029,21 +1052,23 @@ struct ProjectManagerView: View {
                 }
             } // Fine NavigationView
             
-            // Overlay per la tendina "Come funziona l'app" centrata
+            // Overlay per il dropdown "Come funziona l'app" centrato
             if showHowItWorksDropdown {
                 ZStack {
                     Color.black.opacity(0.4)
                         .edgesIgnoringSafeArea(.all)
-                    HowItWorksDropdownView()
+                    HowItWorksDropdownView(showPopup: $showPopup)
                         .frame(width: 300)
                         .background(Color.white)
                         .cornerRadius(10)
                         .shadow(radius: 10)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CloseHowItWorksDropdown"))) { _ in
-                    withAnimation { showHowItWorksDropdown = false }
-                }
                 .transition(.scale)
+            }
+            // Se il popup della medaglia è attivo, mostrane l'overlay
+            if showPopup {
+                PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
+                    .transition(.scale)
             }
         }
     }
