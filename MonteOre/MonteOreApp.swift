@@ -303,19 +303,16 @@ class ProjectManager: ObservableObject {
     }
 }
 
-// MARK: - Export Data Model and Export Method (CHANGED)
-// New export data model to combine both current and backup projects.
+// MARK: - Export Data Model and Export Method
 struct ExportData: Codable {
     let projects: [Project]
     let backupProjects: [Project]
 }
 extension ProjectManager {
-    // New method to get the export URL for combined projects.
     func getExportURL() -> URL? {
         let exportData = ExportData(projects: projects, backupProjects: backupProjects)
         do {
             let data = try JSONEncoder().encode(exportData)
-            // Save to a temporary file.
             let tempDir = FileManager.default.temporaryDirectory
             let exportURL = tempDir.appendingPathComponent("MonteOreExport.json")
             try data.write(to: exportURL)
@@ -327,8 +324,7 @@ extension ProjectManager {
     }
 }
 
-// MARK: - Import Confirmation View (CHANGED)
-// New view to confirm file import, similar to DeleteConfirmationView.
+// MARK: - Import Confirmation View
 struct ImportConfirmationView: View {
     let message: String
     let importAction: () -> Void
@@ -343,9 +339,7 @@ struct ImportConfirmationView: View {
                 .multilineTextAlignment(.center)
                 .padding()
             HStack {
-                Button(action: {
-                    cancelAction()
-                }) {
+                Button(action: { cancelAction() }) {
                     Text("Annulla")
                         .font(.title2)
                         .foregroundColor(.red)
@@ -354,9 +348,7 @@ struct ImportConfirmationView: View {
                         .background(Color.white)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red, lineWidth: 2))
                 }
-                Button(action: {
-                    importAction()
-                }) {
+                Button(action: { importAction() }) {
                     Text("Importa")
                         .font(.title2)
                         .foregroundColor(.white)
@@ -416,22 +408,107 @@ struct PopupView: View {
     }
 }
 
-// MARK: - How It Works Dropdown (MODIFICA 1)
-struct HowItWorksDropdownView: View {
-    @Binding var showDropdown: Bool
+// MARK: - Custom Curved Arrow Shapes
+struct CurvedArrowRight: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        // Disegna una curva che parte dalla sinistra verso destra con una freccia
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10),
+                          control: CGPoint(x: rect.midX, y: rect.minY))
+        // Aggiungi la freccia
+        path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - 20))
+        path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return path
+    }
+}
+
+struct CurvedArrowLeft: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        // Disegna una curva da destra a sinistra
+        path.move(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10),
+                          control: CGPoint(x: rect.midX, y: rect.minY))
+        // Aggiungi la freccia
+        path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY - 20))
+        path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        return path
+    }
+}
+
+// MARK: - No Notes Prompt View (MODIFICA 3)
+struct NoNotesPromptView: View {
     @Binding var showPopup: Bool
+    
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 16) {
+            // Il testo principale, in alto
+            Text("Dai, datti da fare!")
+                .font(.custom("Permanent Marker", size: 36))
+                .bold()
+                .foregroundColor(.black)
+                .padding(.top, 20)
+                .padding(.bottom, 40)
+                .overlay(
+                    GeometryReader { geo in
+                        // Freccia sinistra (curvilinea) che parte dalla frase e punta verso Gestione Progetti
+                        CurvedArrowLeft()
+                            .stroke(Color.black, lineWidth: 2)
+                            .frame(width: geo.size.width * 0.8, height: 50)
+                            .offset(x: -geo.size.width * 0.3, y: geo.size.height + 10)
+                    }
+                )
+            
+            HStack {
+                Spacer()
+                Button(action: {
+                    withAnimation {
+                        // Mostra dropdown per "Non c'ho sbatti"
+                    }
+                }) {
+                    Text("Non c'ho sbatti")
+                        .font(.custom("Permanent Marker", size: 24))
+                        .bold()
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(8)
+                }
+                .overlay(
+                    GeometryReader { geo in
+                        // Freccia destra (curvilinea) che parte dalla frase e punta al bottone senza toccarlo
+                        CurvedArrowRight()
+                            .stroke(Color.black, lineWidth: 2)
+                            .frame(width: geo.size.width * 1.2, height: 40)
+                            .offset(x: -geo.size.width * 0.8, y: -30)
+                    }
+                )
+                Spacer()
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - How It Works Dropdown (MODIFICA 1)
+// Questa view comparirà centrata sullo schermo
+struct HowItWorksDropdownView: View {
+    var body: some View {
+        VStack(spacing: 16) {
             Text("Frate, ma è una minchiata.. smanetta un po'")
                 .font(.custom("Permanent Marker", size: 24))
+                .bold()
                 .foregroundColor(.black)
             Button(action: {
+                // Il bottone TOP chiude la tendina e mostra il popup
                 withAnimation {
-                    showDropdown = false
-                }
-                showPopup = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    showPopup = false
+                    // La logica per chiudere il dropdown viene gestita nel chiamante
+                    NotificationCenter.default.post(name: NSNotification.Name("CloseHowItWorksDropdown"), object: nil)
                 }
             }) {
                 Text("TOP")
@@ -448,75 +525,6 @@ struct HowItWorksDropdownView: View {
     }
 }
 
-// MARK: - No Notes Prompt View (MODIFICA 3)
-struct NoNotesPromptView: View {
-    @Binding var showPopup: Bool
-    @State private var showDropdown: Bool = false
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Dai, datti da fare!")
-                .font(.custom("Permanent Marker", size: 32))
-                .foregroundColor(.black)
-            HStack {
-                // Freccia sinistra che indica "Gestione Progetti"
-                Image(systemName: "arrow.down.left")
-                    .resizable()
-                    .frame(width: 30, height: 30)
-                    .foregroundColor(.black)
-                Spacer()
-                Button(action: {
-                    withAnimation {
-                        showDropdown.toggle()
-                    }
-                }) {
-                    Text("Non c'ho sbatti")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(8)
-                }
-                .overlay(
-                    // Freccia destra che “toca” il bottone
-                    Image(systemName: "arrow.down.right")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .foregroundColor(.black)
-                        .offset(x: 30, y: -20)
-                )
-            }
-            .padding(.horizontal)
-            if showDropdown {
-                VStack(spacing: 8) {
-                    Text("Frate, nemmeno io")
-                        .font(.custom("Permanent Marker", size: 24))
-                        .foregroundColor(.black)
-                    Button(action: {
-                        withAnimation {
-                            showDropdown = false
-                        }
-                        showPopup = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            showPopup = false
-                        }
-                    }) {
-                        Text("Daje")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.green)
-                            .cornerRadius(8)
-                    }
-                }
-                .padding()
-                .background(Color.white)
-                .cornerRadius(10)
-            }
-        }
-        .padding()
-    }
-}
-
 // MARK: - Main Views
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
@@ -528,15 +536,14 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
-            let isBackup = projectManager.currentProject.map { cp in
-                projectManager.backupProjects.contains(where: { $0.id == cp.id })
-            } ?? false
+            // Il prompt NoNotesPromptView compare solo se non esiste un progetto corrente oppure se non ha note
+            let showPrompt = (projectManager.currentProject == nil) || (projectManager.currentProject?.noteRows.isEmpty ?? true)
             
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
-                    // MODIFICA 3: Se non esistono note (o non esiste alcun progetto corrente), mostra il prompt
-                    if projectManager.currentProject == nil || projectManager.currentProject?.noteRows.isEmpty == true {
+                    
+                    if showPrompt {
                         NoNotesPromptView(showPopup: $showNoNotesPopup)
                     }
                     
@@ -561,7 +568,7 @@ struct ContentView: View {
                             .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
                             .background(Circle().fill(Color.black))
                     }
-                    .disabled(isBackup)
+                    .disabled(projectManager.currentProject == nil)
                     
                     HStack {
                         Button(action: {
@@ -591,13 +598,12 @@ struct ContentView: View {
                                 .overlay(Circle().stroke(Color.black, lineWidth: 2))
                         }
                         .background(Color(hex: "#54c0ff"))
-                        .disabled(isBackup)
+                        .disabled(projectManager.currentProject == nil)
                     }
                     .padding(.horizontal, isLandscape ? 10 : 30)
                     .padding(.bottom, isLandscape ? 0 : 30)
                 }
                 
-                // Se il popup della NoNotesPromptView è attivo, mostrane l'overlay
                 if showNoNotesPopup {
                     PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Frate, fattelo venire lo sbatti\"")
                         .transition(.scale)
@@ -789,23 +795,23 @@ struct ProjectManagerView: View {
     @State private var showRenameSheet: Bool = false
     @State private var projectToRename: Project? = nil
     @State private var renameNewName: String = ""
-    // Separate state variables for deletion sheets.
+    // Stati per le deletion sheet.
     @State private var projectForDeletionMain: Project? = nil
     @State private var projectForDeletionBackup: Project? = nil
     
-    // Updated state for file sharing and importing.
+    // Stati per la condivisione/importazione.
     @State private var showShareSheet: Bool = false
     @State private var showImportSheet: Bool = false
     @State private var importError: AlertError? = nil
     
-    // NEW STATE (CHANGED): Temporarily hold imported data for confirmation.
+    // Stato per dati importati in attesa di conferma.
     @State private var pendingImportData: ExportData? = nil
     @State private var showImportConfirmationSheet: Bool = false
     
-    // MODIFICA 1: Stati per il dropdown "Come funziona l'app?" e il popup relativo
+    // Stati per il pulsante "Come funziona l'app"
+    @State private var showHowItWorksSecondButton: Bool = false
     @State private var showHowItWorksDropdown: Bool = false
-    @State private var showHowItWorksPopup: Bool = false
-
+    
     var body: some View {
         ZStack {
             NavigationView {
@@ -821,7 +827,6 @@ struct ProjectManagerView: View {
                                             .font(.title3)
                                     }
                                     Spacer()
-                                    // Rinomina button.
                                     Button(action: {
                                         projectToRename = project
                                         renameNewName = project.name
@@ -832,7 +837,6 @@ struct ProjectManagerView: View {
                                             .foregroundColor(.blue)
                                     }
                                     .buttonStyle(BorderlessButtonStyle())
-                                    // Elimina button opens deletion sheet.
                                     Button(action: {
                                         projectForDeletionMain = project
                                     }) {
@@ -859,7 +863,6 @@ struct ProjectManagerView: View {
                                             .font(.title3)
                                     }
                                     Spacer()
-                                    // Elimina button for backup.
                                     Button(action: {
                                         projectForDeletionBackup = project
                                     }) {
@@ -890,7 +893,6 @@ struct ProjectManagerView: View {
                     }
                     .padding()
                     
-                    // Updated Share Button.
                     Button(action: {
                         showShareSheet = true
                     }) {
@@ -916,18 +918,27 @@ struct ProjectManagerView: View {
                 .navigationTitle("Gestione Progetti")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            withAnimation {
-                                showHowItWorksDropdown.toggle()
-                            }
-                        }) {
-                            if showHowItWorksDropdown {
-                                Text("Come funziona l'app?")
+                        if showHowItWorksSecondButton {
+                            Button(action: {
+                                withAnimation {
+                                    showHowItWorksDropdown = true
+                                }
+                            }) {
+                                Text("Come funziona l'app")
                                     .font(.custom("Permanent Marker", size: 20))
-                                    .foregroundColor(.yellow)
-                            } else {
+                                    .foregroundColor(.black)
+                                    .padding(8)
+                                    .background(Color.yellow)
+                                    .cornerRadius(8)
+                            }
+                        } else {
+                            Button(action: {
+                                withAnimation {
+                                    showHowItWorksSecondButton = true
+                                }
+                            }) {
                                 Text("?")
-                                    .font(.headline)
+                                    .font(.system(size: 40))
                                     .bold()
                                     .foregroundColor(.yellow)
                             }
@@ -952,9 +963,7 @@ struct ProjectManagerView: View {
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .padding()
                         HStack(spacing: 40) {
-                            Button("Annulla") {
-                                showRenameSheet = false
-                            }
+                            Button("Annulla") { showRenameSheet = false }
                             Button("OK") {
                                 if let project = projectToRename {
                                     projectManager.renameProject(project: project, newName: renameNewName)
@@ -967,7 +976,6 @@ struct ProjectManagerView: View {
                     }
                     .padding()
                 }
-                // Updated share sheet to use getExportURL().
                 .sheet(isPresented: $showShareSheet) {
                     if let exportURL = projectManager.getExportURL() {
                         ActivityView(activityItems: [exportURL])
@@ -975,7 +983,6 @@ struct ProjectManagerView: View {
                         Text("Errore nell'esportazione")
                     }
                 }
-                // Modified file importer with security-scoped access and confirmation (CHANGED).
                 .fileImporter(isPresented: $showImportSheet, allowedContentTypes: [UTType.json]) { result in
                     switch result {
                     case .success(let url):
@@ -984,7 +991,6 @@ struct ProjectManagerView: View {
                             do {
                                 let data = try Data(contentsOf: url)
                                 let importedData = try JSONDecoder().decode(ExportData.self, from: data)
-                                // Instead of immediately overwriting, store the data and show a confirmation sheet.
                                 pendingImportData = importedData
                                 showImportConfirmationSheet = true
                             } catch {
@@ -1000,18 +1006,15 @@ struct ProjectManagerView: View {
                 .alert(item: $importError) { error in
                     Alert(title: Text("Errore"), message: Text(error.message), dismissButton: .default(Text("OK")))
                 }
-                // New sheet for confirming the import (CHANGED).
                 .sheet(isPresented: $showImportConfirmationSheet) {
                     if let pending = pendingImportData {
                         ImportConfirmationView(
                             message: "Attenzione: sei sicuro di voler sovrascrivere il file corrente? Tutti i progetti saranno persi.",
                             importAction: {
-                                // Overwrite current data.
                                 projectManager.projects = pending.projects
                                 projectManager.backupProjects = pending.backupProjects
                                 projectManager.currentProject = pending.projects.first
                                 projectManager.saveProjects()
-                                // Clear pending data.
                                 pendingImportData = nil
                                 showImportConfirmationSheet = false
                             },
@@ -1026,23 +1029,19 @@ struct ProjectManagerView: View {
                 }
             } // Fine NavigationView
             
-            // MODIFICA 1: Overlay per il dropdown "Come funziona l'app?" nella ProjectManagerView
+            // Overlay per la tendina "Come funziona l'app" centrata
             if showHowItWorksDropdown {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        HowItWorksDropdownView(showDropdown: $showHowItWorksDropdown, showPopup: $showHowItWorksPopup)
-                            .padding()
-                    }
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                    HowItWorksDropdownView()
+                        .frame(width: 300)
+                        .background(Color.white)
+                        .cornerRadius(10)
+                        .shadow(radius: 10)
                 }
-                .transition(.move(edge: .top))
-            }
-            // Se il popup del "Come funziona l'app?" è attivo, mostrane l'overlay
-            if showHowItWorksPopup {
-                VStack {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
-                    Spacer()
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CloseHowItWorksDropdown"))) { _ in
+                    withAnimation { showHowItWorksDropdown = false }
                 }
                 .transition(.scale)
             }
