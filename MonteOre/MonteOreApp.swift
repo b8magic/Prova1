@@ -2,7 +2,6 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers  // For file import/export functionality
 
-
 // MARK: - Color Extension for Hex Colors
 extension Color {
     init(hex: String) {
@@ -28,13 +27,11 @@ extension Color {
     }
 }
 
-
 // MARK: - Alert Error Wrapper
 struct AlertError: Identifiable {
     var id: String { message }
     let message: String
 }
-
 
 // MARK: - ActiveAlert Enum for Alert Handling
 enum ActiveAlert: Identifiable {
@@ -48,10 +45,7 @@ enum ActiveAlert: Identifiable {
     }
 }
 
-
 // MARK: - Data Models
-
-
 struct NoteRow: Identifiable, Codable {
     var id = UUID()
     var giorno: String      // e.g. "Giovedì 18/03/25"
@@ -112,7 +106,6 @@ struct NoteRow: Identifiable, Codable {
     }
 }
 
-
 class Project: Identifiable, ObservableObject, Codable {
     var id = UUID()
     @Published var name: String
@@ -162,7 +155,6 @@ class Project: Identifiable, ObservableObject, Codable {
     }
 }
 
-
 class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
     @Published var currentProject: Project?
@@ -174,10 +166,10 @@ class ProjectManager: ObservableObject {
     init() {
         loadProjects()
         loadBackupProjects()  // Load backups.
+        // MODIFICA 2: App appena installata senza alcun progetto
         if projects.isEmpty {
-            let defaultProject = Project(name: "Progetto 1")
-            self.projects = [defaultProject]
-            self.currentProject = defaultProject
+            self.projects = []
+            self.currentProject = nil
             saveProjects()
         } else {
             self.currentProject = projects.first
@@ -311,15 +303,12 @@ class ProjectManager: ObservableObject {
     }
 }
 
-
 // MARK: - Export Data Model and Export Method (CHANGED)
 // New export data model to combine both current and backup projects.
 struct ExportData: Codable {
     let projects: [Project]
     let backupProjects: [Project]
 }
-
-
 extension ProjectManager {
     // New method to get the export URL for combined projects.
     func getExportURL() -> URL? {
@@ -337,7 +326,6 @@ extension ProjectManager {
         }
     }
 }
-
 
 // MARK: - Import Confirmation View (CHANGED)
 // New view to confirm file import, similar to DeleteConfirmationView.
@@ -383,10 +371,7 @@ struct ImportConfirmationView: View {
     }
 }
 
-
 // MARK: - Delete Confirmation View
-
-
 struct DeleteConfirmationView: View {
     let projectName: String
     let deleteAction: () -> Void
@@ -417,15 +402,128 @@ struct DeleteConfirmationView: View {
     }
 }
 
+// MARK: - Popup View (per notifiche 3d)
+struct PopupView: View {
+    let message: String
+    var body: some View {
+        Text(message)
+            .font(.headline)
+            .foregroundColor(.white)
+            .padding()
+            .background(Color.black.opacity(0.8))
+            .cornerRadius(10)
+            .shadow(radius: 10)
+    }
+}
+
+// MARK: - How It Works Dropdown (MODIFICA 1)
+struct HowItWorksDropdownView: View {
+    @Binding var showDropdown: Bool
+    @Binding var showPopup: Bool
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Frate, ma è una minchiata.. smanetta un po'")
+                .font(.custom("Permanent Marker", size: 24))
+                .foregroundColor(.black)
+            Button(action: {
+                withAnimation {
+                    showDropdown = false
+                }
+                showPopup = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    showPopup = false
+                }
+            }) {
+                Text("TOP")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+    }
+}
+
+// MARK: - No Notes Prompt View (MODIFICA 3)
+struct NoNotesPromptView: View {
+    @Binding var showPopup: Bool
+    @State private var showDropdown: Bool = false
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Dai, datti da fare!")
+                .font(.custom("Permanent Marker", size: 32))
+                .foregroundColor(.black)
+            HStack {
+                // Freccia sinistra che indica "Gestione Progetti"
+                Image(systemName: "arrow.down.left")
+                    .resizable()
+                    .frame(width: 30, height: 30)
+                    .foregroundColor(.black)
+                Spacer()
+                Button(action: {
+                    withAnimation {
+                        showDropdown.toggle()
+                    }
+                }) {
+                    Text("Non c'ho sbatti")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(8)
+                }
+                .overlay(
+                    // Freccia destra che “toca” il bottone
+                    Image(systemName: "arrow.down.right")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundColor(.black)
+                        .offset(x: 30, y: -20)
+                )
+            }
+            .padding(.horizontal)
+            if showDropdown {
+                VStack(spacing: 8) {
+                    Text("Frate, nemmeno io")
+                        .font(.custom("Permanent Marker", size: 24))
+                        .foregroundColor(.black)
+                    Button(action: {
+                        withAnimation {
+                            showDropdown = false
+                        }
+                        showPopup = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            showPopup = false
+                        }
+                    }) {
+                        Text("Daje")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(10)
+            }
+        }
+        .padding()
+    }
+}
 
 // MARK: - Main Views
-
-
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
     @State private var switchAlert: ActiveAlert? = nil
     @State private var showProjectManager: Bool = false
-
+    // Stato per il popup della NoNotesPromptView (MODIFICA 3)
+    @State private var showNoNotesPopup: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -437,7 +535,12 @@ struct ContentView: View {
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
-                    if let project = projectManager.currentProject {
+                    // MODIFICA 3: Se non esistono note (o non esiste alcun progetto corrente), mostra il prompt
+                    if projectManager.currentProject == nil || projectManager.currentProject?.noteRows.isEmpty == true {
+                        NoNotesPromptView(showPopup: $showNoNotesPopup)
+                    }
+                    
+                    if let project = projectManager.currentProject, !project.noteRows.isEmpty {
                         ScrollView {
                             NoteView(project: project)
                                 .padding()
@@ -492,6 +595,12 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, isLandscape ? 10 : 30)
                     .padding(.bottom, isLandscape ? 0 : 30)
+                }
+                
+                // Se il popup della NoNotesPromptView è attivo, mostrane l'overlay
+                if showNoNotesPopup {
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Frate, fattelo venire lo sbatti\"")
+                        .transition(.scale)
                 }
             }
             .sheet(isPresented: $showProjectManager) {
@@ -570,10 +679,9 @@ struct ContentView: View {
     }
     
     func playSound(success: Bool) {
-        // Implement sound playing using AVFoundation if desired.
+        // Implementa la riproduzione audio con AVFoundation se desiderato.
     }
 }
-
 
 struct NoteView: View {
     @ObservedObject var project: Project
@@ -675,7 +783,6 @@ struct NoteView: View {
     }
 }
 
-
 struct ProjectManagerView: View {
     @ObservedObject var projectManager: ProjectManager
     @State private var newProjectName: String = ""
@@ -695,209 +802,253 @@ struct ProjectManagerView: View {
     @State private var pendingImportData: ExportData? = nil
     @State private var showImportConfirmationSheet: Bool = false
     
+    // MODIFICA 1: Stati per il dropdown "Come funziona l'app?" e il popup relativo
+    @State private var showHowItWorksDropdown: Bool = false
+    @State private var showHowItWorksPopup: Bool = false
+
     var body: some View {
-        NavigationView {
-            VStack {
-                List {
-                    Section(header: Text("Progetti Correnti")) {
-                        ForEach(projectManager.projects) { project in
-                            HStack {
-                                Button(action: {
-                                    projectManager.currentProject = project
-                                }) {
-                                    Text(project.name)
-                                        .font(.title3)
+        ZStack {
+            NavigationView {
+                VStack {
+                    List {
+                        Section(header: Text("Progetti Correnti")) {
+                            ForEach(projectManager.projects) { project in
+                                HStack {
+                                    Button(action: {
+                                        projectManager.currentProject = project
+                                    }) {
+                                        Text(project.name)
+                                            .font(.title3)
+                                    }
+                                    Spacer()
+                                    // Rinomina button.
+                                    Button(action: {
+                                        projectToRename = project
+                                        renameNewName = project.name
+                                        showRenameSheet = true
+                                    }) {
+                                        Text("Rinomina")
+                                            .font(.title3)
+                                            .foregroundColor(.blue)
+                                    }
+                                    .buttonStyle(BorderlessButtonStyle())
+                                    // Elimina button opens deletion sheet.
+                                    Button(action: {
+                                        projectForDeletionMain = project
+                                    }) {
+                                        Text("Elimina")
+                                            .font(.title3)
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(BorderlessButtonStyle())
                                 }
-                                Spacer()
-                                // Rinomina button.
-                                Button(action: {
-                                    projectToRename = project
-                                    renameNewName = project.name
-                                    showRenameSheet = true
-                                }) {
-                                    Text("Rinomina")
-                                        .font(.title3)
-                                        .foregroundColor(.blue)
-                                }
-                                .buttonStyle(BorderlessButtonStyle())
-                                // Elimina button opens deletion sheet.
-                                Button(action: {
-                                    projectForDeletionMain = project
-                                }) {
-                                    Text("Elimina")
-                                        .font(.title3)
-                                        .foregroundColor(.red)
-                                }
-                                .buttonStyle(BorderlessButtonStyle())
+                                .padding(.vertical, 4)
                             }
-                            .padding(.vertical, 4)
+                        }
+                        
+                        Section(header: VStack {
+                            Divider()
+                            Text("Mensilità passate")
+                        }) {
+                            ForEach(projectManager.backupProjects) { project in
+                                HStack {
+                                    Button(action: {
+                                        projectManager.currentProject = project
+                                    }) {
+                                        Text(project.name)
+                                            .font(.title3)
+                                    }
+                                    Spacer()
+                                    // Elimina button for backup.
+                                    Button(action: {
+                                        projectForDeletionBackup = project
+                                    }) {
+                                        Text("Elimina")
+                                            .font(.title3)
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(BorderlessButtonStyle())
+                                }
+                                .padding(.vertical, 4)
+                            }
                         }
                     }
+                    .listStyle(PlainListStyle())
                     
-                    Section(header: VStack {
-                        Divider()
-                        Text("Mensilità passate")
+                    HStack {
+                        TextField("Nuovo progetto", text: $newProjectName)
+                            .font(.title3)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Button("Crea") {
+                            if !newProjectName.isEmpty {
+                                projectManager.addProject(name: newProjectName)
+                                newProjectName = ""
+                            }
+                        }
+                        .font(.title3)
+                        .foregroundColor(.green)
+                    }
+                    .padding()
+                    
+                    // Updated Share Button.
+                    Button(action: {
+                        showShareSheet = true
                     }) {
-                        ForEach(projectManager.backupProjects) { project in
-                            HStack {
-                                Button(action: {
-                                    projectManager.currentProject = project
-                                }) {
-                                    Text(project.name)
-                                        .font(.title3)
-                                }
-                                Spacer()
-                                // Elimina button for backup.
-                                Button(action: {
-                                    projectForDeletionBackup = project
-                                }) {
-                                    Text("Elimina")
-                                        .font(.title3)
-                                        .foregroundColor(.red)
-                                }
-                                .buttonStyle(BorderlessButtonStyle())
+                        Text("Condividi Monte Ore")
+                            .font(.title3)
+                            .foregroundColor(.purple)
+                            .padding()
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple, lineWidth: 2))
+                    }
+                    .padding(.bottom, 10)
+                    
+                    Button(action: {
+                        showImportSheet = true
+                    }) {
+                        Text("Importa File")
+                            .font(.title3)
+                            .foregroundColor(.orange)
+                            .padding()
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange, lineWidth: 2))
+                    }
+                    .padding(.bottom, 10)
+                }
+                .navigationTitle("Gestione Progetti")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            withAnimation {
+                                showHowItWorksDropdown.toggle()
                             }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-                .listStyle(PlainListStyle())
-                
-                HStack {
-                    TextField("Nuovo progetto", text: $newProjectName)
-                        .font(.title3)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    Button("Crea") {
-                        if !newProjectName.isEmpty {
-                            projectManager.addProject(name: newProjectName)
-                            newProjectName = ""
-                        }
-                    }
-                    .font(.title3)
-                    .foregroundColor(.green)
-                }
-                .padding()
-                
-                // Updated Share Button.
-                Button(action: {
-                    showShareSheet = true
-                }) {
-                    Text("Condividi Monte Ore")
-                        .font(.title3)
-                        .foregroundColor(.purple)
-                        .padding()
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple, lineWidth: 2))
-                }
-                .padding(.bottom, 10)
-                
-                Button(action: {
-                    showImportSheet = true
-                }) {
-                    Text("Importa File")
-                        .font(.title3)
-                        .foregroundColor(.orange)
-                        .padding()
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange, lineWidth: 2))
-                }
-                .padding(.bottom, 10)
-            }
-            .navigationTitle("Gestione Progetti")
-            .sheet(item: $projectForDeletionMain) { project in
-                DeleteConfirmationView(projectName: project.name) {
-                    projectManager.deleteProject(project: project)
-                }
-            }
-            .sheet(item: $projectForDeletionBackup) { project in
-                DeleteConfirmationView(projectName: project.name) {
-                    projectManager.deleteBackupProject(project: project)
-                }
-            }
-            .sheet(isPresented: $showRenameSheet) {
-                VStack(spacing: 20) {
-                    Text("Rinomina Progetto")
-                        .font(.title)
-                    TextField("Nuovo nome", text: $renameNewName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                    HStack(spacing: 40) {
-                        Button("Annulla") {
-                            showRenameSheet = false
-                        }
-                        Button("OK") {
-                            if let project = projectToRename {
-                                projectManager.renameProject(project: project, newName: renameNewName)
+                        }) {
+                            if showHowItWorksDropdown {
+                                Text("Come funziona l'app?")
+                                    .font(.custom("Permanent Marker", size: 20))
+                                    .foregroundColor(.yellow)
+                            } else {
+                                Text("?")
+                                    .font(.headline)
+                                    .bold()
+                                    .foregroundColor(.yellow)
                             }
-                            showRenameSheet = false
                         }
                     }
-                    .font(.title2)
+                }
+                .sheet(item: $projectForDeletionMain) { project in
+                    DeleteConfirmationView(projectName: project.name) {
+                        projectManager.deleteProject(project: project)
+                    }
+                }
+                .sheet(item: $projectForDeletionBackup) { project in
+                    DeleteConfirmationView(projectName: project.name) {
+                        projectManager.deleteBackupProject(project: project)
+                    }
+                }
+                .sheet(isPresented: $showRenameSheet) {
+                    VStack(spacing: 20) {
+                        Text("Rinomina Progetto")
+                            .font(.title)
+                        TextField("Nuovo nome", text: $renameNewName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding()
+                        HStack(spacing: 40) {
+                            Button("Annulla") {
+                                showRenameSheet = false
+                            }
+                            Button("OK") {
+                                if let project = projectToRename {
+                                    projectManager.renameProject(project: project, newName: renameNewName)
+                                }
+                                showRenameSheet = false
+                            }
+                        }
+                        .font(.title2)
+                        Spacer()
+                    }
+                    .padding()
+                }
+                // Updated share sheet to use getExportURL().
+                .sheet(isPresented: $showShareSheet) {
+                    if let exportURL = projectManager.getExportURL() {
+                        ActivityView(activityItems: [exportURL])
+                    } else {
+                        Text("Errore nell'esportazione")
+                    }
+                }
+                // Modified file importer with security-scoped access and confirmation (CHANGED).
+                .fileImporter(isPresented: $showImportSheet, allowedContentTypes: [UTType.json]) { result in
+                    switch result {
+                    case .success(let url):
+                        if url.startAccessingSecurityScopedResource() {
+                            defer { url.stopAccessingSecurityScopedResource() }
+                            do {
+                                let data = try Data(contentsOf: url)
+                                let importedData = try JSONDecoder().decode(ExportData.self, from: data)
+                                // Instead of immediately overwriting, store the data and show a confirmation sheet.
+                                pendingImportData = importedData
+                                showImportConfirmationSheet = true
+                            } catch {
+                                importError = AlertError(message: "Errore nell'importazione: \(error)")
+                            }
+                        } else {
+                            importError = AlertError(message: "Non è possibile accedere al file importato.")
+                        }
+                    case .failure(let error):
+                        importError = AlertError(message: "Errore: \(error.localizedDescription)")
+                    }
+                }
+                .alert(item: $importError) { error in
+                    Alert(title: Text("Errore"), message: Text(error.message), dismissButton: .default(Text("OK")))
+                }
+                // New sheet for confirming the import (CHANGED).
+                .sheet(isPresented: $showImportConfirmationSheet) {
+                    if let pending = pendingImportData {
+                        ImportConfirmationView(
+                            message: "Attenzione: sei sicuro di voler sovrascrivere il file corrente? Tutti i progetti saranno persi.",
+                            importAction: {
+                                // Overwrite current data.
+                                projectManager.projects = pending.projects
+                                projectManager.backupProjects = pending.backupProjects
+                                projectManager.currentProject = pending.projects.first
+                                projectManager.saveProjects()
+                                // Clear pending data.
+                                pendingImportData = nil
+                                showImportConfirmationSheet = false
+                            },
+                            cancelAction: {
+                                pendingImportData = nil
+                                showImportConfirmationSheet = false
+                            }
+                        )
+                    } else {
+                        Text("Errore: nessun dato da importare.")
+                    }
+                }
+            } // Fine NavigationView
+            
+            // MODIFICA 1: Overlay per il dropdown "Come funziona l'app?" nella ProjectManagerView
+            if showHowItWorksDropdown {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        HowItWorksDropdownView(showDropdown: $showHowItWorksDropdown, showPopup: $showHowItWorksPopup)
+                            .padding()
+                    }
+                }
+                .transition(.move(edge: .top))
+            }
+            // Se il popup del "Come funziona l'app?" è attivo, mostrane l'overlay
+            if showHowItWorksPopup {
+                VStack {
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
                     Spacer()
                 }
-                .padding()
-            }
-            // Updated share sheet to use getExportURL().
-            .sheet(isPresented: $showShareSheet) {
-                if let exportURL = projectManager.getExportURL() {
-                    ActivityView(activityItems: [exportURL])
-                } else {
-                    Text("Errore nell'esportazione")
-                }
-            }
-            // Modified file importer with security-scoped access and confirmation (CHANGED).
-            .fileImporter(isPresented: $showImportSheet, allowedContentTypes: [UTType.json]) { result in
-                switch result {
-                case .success(let url):
-                    if url.startAccessingSecurityScopedResource() {
-                        defer { url.stopAccessingSecurityScopedResource() }
-                        do {
-                            let data = try Data(contentsOf: url)
-                            let importedData = try JSONDecoder().decode(ExportData.self, from: data)
-                            // Instead of immediately overwriting, store the data and show a confirmation sheet.
-                            pendingImportData = importedData
-                            showImportConfirmationSheet = true
-                        } catch {
-                            importError = AlertError(message: "Errore nell'importazione: \(error)")
-                        }
-                    } else {
-                        importError = AlertError(message: "Non è possibile accedere al file importato.")
-                    }
-                case .failure(let error):
-                    importError = AlertError(message: "Errore: \(error.localizedDescription)")
-                }
-            }
-            .alert(item: $importError) { error in
-                Alert(title: Text("Errore"), message: Text(error.message), dismissButton: .default(Text("OK")))
-            }
-            // New sheet for confirming the import (CHANGED).
-            .sheet(isPresented: $showImportConfirmationSheet) {
-                if let pending = pendingImportData {
-                    ImportConfirmationView(
-                        message: "Attenzione: sei sicuro di voler sovrascrivere il file corrente? Tutti i progetti saranno persi.",
-                        importAction: {
-                            // Overwrite current data.
-                            projectManager.projects = pending.projects
-                            projectManager.backupProjects = pending.backupProjects
-                            projectManager.currentProject = pending.projects.first
-                            projectManager.saveProjects()
-                            // Clear pending data.
-                            pendingImportData = nil
-                            showImportConfirmationSheet = false
-                        },
-                        cancelAction: {
-                            pendingImportData = nil
-                            showImportConfirmationSheet = false
-                        }
-                    )
-                } else {
-                    Text("Errore: nessun dato da importare.")
-                }
+                .transition(.scale)
             }
         }
     }
-    
-    // Removed confirmOverwrite() function in favor of a confirmation sheet.
 }
-
 
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
@@ -911,7 +1062,6 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-
 @main
 struct MyTimeTrackerApp: App {
     var body: some Scene {
@@ -920,8 +1070,3 @@ struct MyTimeTrackerApp: App {
         }
     }
 }
-
-
-
-
-
