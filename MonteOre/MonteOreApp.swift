@@ -157,7 +157,6 @@ class ProjectManager: ObservableObject {
     init() {
         loadProjects()
         loadBackupProjects()
-        // Se non esistono progetti, currentProject resta nil
         if projects.isEmpty {
             self.projects = []
             self.currentProject = nil
@@ -395,17 +394,16 @@ struct PopupView: View {
 // MARK: - Nuove Sheet per le Tendine
 
 struct NonCHoSbattiSheetView: View {
-    // Chiamata al completamento
     let onDismiss: () -> Void
     var body: some View {
         VStack(spacing: 20) {
-            Text("Frate, nemmeno io")
+            Text("Frate, nemmeno io...")
                 .font(.custom("Permanent Marker", size: 28))
                 .bold()
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
             Button(action: { onDismiss() }) {
-                Text("Daje")
+                Text("Mh")
                     .font(.title2)
                     .foregroundColor(.white)
                     .padding()
@@ -428,7 +426,7 @@ struct ComeFunzionaSheetView: View {
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
             Button(action: { onDismiss() }) {
-                Text("TOP")
+                Text("Mh")
                     .font(.title2)
                     .foregroundColor(.white)
                     .padding()
@@ -443,9 +441,8 @@ struct ComeFunzionaSheetView: View {
 
 // MARK: - NoNotesPromptView
 struct NoNotesPromptView: View {
-    // In questo caso il prompt viene mostrato quando non esiste alcun progetto
-    // Il bottone apre la sheet per "Non c'ho sbatti"
-    let onOpenSheet: () -> Void
+    let onOk: () -> Void
+    let onNonCHoSbatti: () -> Void
     var body: some View {
         VStack(spacing: 16) {
             Text("Dai, datti da fare!")
@@ -453,8 +450,8 @@ struct NoNotesPromptView: View {
                 .bold()
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
-            Button(action: { onOpenSheet() }) {
-                Text("Non c'ho sbatti")
+            Button(action: { onOk() }) {
+                Text("Ok!")
                     .font(.custom("Permanent Marker", size: 24))
                     .bold()
                     .foregroundColor(.white)
@@ -463,32 +460,18 @@ struct NoNotesPromptView: View {
                     .background(Color.green)
                     .cornerRadius(8)
             }
-        }
-        .padding()
-    }
-}
-
-// MARK: - HowItWorksDropdownView (ora in sheet)
-struct HowItWorksDropdownView: View {
-    let onDismiss: () -> Void
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Frate, ma è una minchiata.. smanetta un po'")
-                .font(.custom("Permanent Marker", size: 28))
-                .bold()
-                .foregroundColor(.black)
-                .multilineTextAlignment(.center)
-            Button(action: { onDismiss() }) {
-                Text("TOP")
-                    .font(.title2)
+            Button(action: { onNonCHoSbatti() }) {
+                Text("Non c'ho sbatti")
+                    .font(.custom("Permanent Marker", size: 24))
+                    .bold()
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.green)
+                    .background(Color.red)
                     .cornerRadius(8)
             }
         }
-        .padding(30)
+        .padding()
     }
 }
 
@@ -497,26 +480,25 @@ struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
     @State private var switchAlert: ActiveAlert? = nil
     @State private var showProjectManager: Bool = false
-    // Stato per la sheet "Non c'ho sbatti"
     @State private var showNonCHoSbattiSheet: Bool = false
-    // Stato per il popup della medaglia
     @State private var showPopup: Bool = false
-    // Utilizziamo AppStorage per ricordare se la medaglia è già stata mostrata
+    // Usiamo AppStorage per mostrare la medaglia una sola volta
     @AppStorage("medalAwarded") private var medalAwarded: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
-            // Se non esiste un progetto corrente, mostriamo il prompt
+            // Mostriamo il prompt solo se non esiste un progetto corrente
             let showPrompt = projectManager.currentProject == nil
             
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
                     if showPrompt {
-                        NoNotesPromptView {
-                            showNonCHoSbattiSheet = true
-                        }
+                        NoNotesPromptView(
+                            onOk: { showProjectManager = true },
+                            onNonCHoSbatti: { showNonCHoSbattiSheet = true }
+                        )
                     } else {
                         if let project = projectManager.currentProject {
                             ScrollView {
@@ -586,7 +568,6 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showNonCHoSbattiSheet) {
                 NonCHoSbattiSheetView {
-                    // Al dismiss: se la medaglia non è già stata mostrata, la mostriamo e salviamo il flag
                     if !medalAwarded {
                         medalAwarded = true
                         showPopup = true
@@ -862,14 +843,18 @@ struct ProjectManagerView: View {
                         TextField("Nuovo progetto", text: $newProjectName)
                             .font(.title3)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        Button("Crea") {
+                        Button(action: {
                             if !newProjectName.isEmpty {
                                 projectManager.addProject(name: newProjectName)
                                 newProjectName = ""
                             }
+                        }) {
+                            Text("Crea")
+                                .font(.title3)
+                                .foregroundColor(.green)
+                                .padding(8)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
                         }
-                        .font(.title3)
-                        .foregroundColor(.green)
                     }
                     .padding()
                     
@@ -1009,7 +994,6 @@ struct ProjectManagerView: View {
                 }
             } // Fine NavigationView
             
-            // Sheet per "Come funziona l'app"
             .sheet(isPresented: $showComeFunzionaSheet) {
                 ComeFunzionaSheetView {
                     showComeFunzionaSheet = false
