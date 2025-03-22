@@ -10,11 +10,11 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
+        case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
+        case 6:
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
+        case 8:
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
@@ -36,7 +36,6 @@ struct AlertError: Identifiable {
 // MARK: - ActiveAlert Enum for Alert Handling
 enum ActiveAlert: Identifiable {
     case running(newProject: Project, message: String)
-    
     var id: String {
         switch self {
         case .running(let newProject, _):
@@ -50,13 +49,12 @@ struct NoteRow: Identifiable, Codable {
     var id = UUID()
     var giorno: String      // e.g. "Giovedì 18/03/25"
     var orari: String       // e.g. "14:32-17:12 17:18-"
-    var note: String = ""   // Additional remarks
+    var note: String = ""
     
     enum CodingKeys: String, CodingKey {
         case id, giorno, orari, note
     }
     
-    // Custom initializer to support older exports.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -65,14 +63,12 @@ struct NoteRow: Identifiable, Codable {
         note = (try? container.decode(String.self, forKey: .note)) ?? ""
     }
     
-    // Default initializer.
     init(giorno: String, orari: String, note: String = "") {
         self.giorno = giorno
         self.orari = orari
         self.note = note
     }
     
-    // Compute total minutes from completed intervals.
     var totalMinutes: Int {
         let segments = orari.split(separator: " ")
         var total = 0
@@ -96,7 +92,6 @@ struct NoteRow: Identifiable, Codable {
         return "\(hours)h \(minutes)m"
     }
     
-    // Helper: convert "HH:mm" into total minutes.
     func minutesFromString(_ timeStr: String) -> Int? {
         let parts = timeStr.split(separator: ":")
         if parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) {
@@ -120,7 +115,6 @@ class Project: Identifiable, ObservableObject, Codable {
         self.noteRows = []
     }
     
-    // MARK: - Codable Conformance
     required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -135,7 +129,6 @@ class Project: Identifiable, ObservableObject, Codable {
         try container.encode(noteRows, forKey: .noteRows)
     }
     
-    // Total minutes for the entire project.
     var totalProjectMinutes: Int {
         noteRows.reduce(0) { $0 + $1.totalMinutes }
     }
@@ -146,7 +139,6 @@ class Project: Identifiable, ObservableObject, Codable {
         return "\(hours)h \(minutes)m"
     }
     
-    // Helper: parse the "giorno" string into a Date.
     func dateFromGiorno(_ giorno: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "it_IT")
@@ -158,15 +150,14 @@ class Project: Identifiable, ObservableObject, Codable {
 class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
     @Published var currentProject: Project?
-    @Published var backupProjects: [Project] = []  // Holds backup (past month) projects.
+    @Published var backupProjects: [Project] = []
     
-    // File‑based saving.
     private let projectsFileName = "projects.json"
     
     init() {
         loadProjects()
-        loadBackupProjects()  // Load backups.
-        // MODIFICA 2: App appena installata senza alcun progetto
+        loadBackupProjects()
+        // Se non esistono progetti, currentProject resta nil
         if projects.isEmpty {
             self.projects = []
             self.currentProject = nil
@@ -198,7 +189,6 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // Delete a backup project.
     func deleteBackupProject(project: Project) {
         let fm = FileManager.default
         let url = getURLForBackup(project: project)
@@ -208,15 +198,12 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // A project is “in corso” (running) if its last note row's orari ends with a dash.
     func isProjectRunning(_ project: Project) -> Bool {
         if let lastRow = project.noteRows.last {
             return lastRow.orari.hasSuffix("-")
         }
         return false
     }
-    
-    // MARK: - File Persistence Methods
     
     func getProjectsFileURL() -> URL {
         let fm = FileManager.default
@@ -241,7 +228,6 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // Return URL for a backup file.
     func getURLForBackup(project: Project) -> URL {
         let fm = FileManager.default
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -249,7 +235,6 @@ class ProjectManager: ObservableObject {
         return docs.appendingPathComponent(backupFileName)
     }
     
-    // Backup current project when new month starts.
     func backupCurrentProjectIfNeeded(_ project: Project, currentDate: Date, currentGiorno: String) {
         if let lastRow = project.noteRows.last,
            lastRow.giorno != currentGiorno,
@@ -282,7 +267,6 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // Load backup projects.
     func loadBackupProjects() {
         backupProjects = []
         let fm = FileManager.default
@@ -303,7 +287,7 @@ class ProjectManager: ObservableObject {
     }
 }
 
-// MARK: - Export Data Model and Export Method
+// MARK: - Export & Import
 struct ExportData: Codable {
     let projects: [Project]
     let backupProjects: [Project]
@@ -394,7 +378,7 @@ struct DeleteConfirmationView: View {
     }
 }
 
-// MARK: - Popup View (per notifiche 3d)
+// MARK: - Popup View (Medaglia)
 struct PopupView: View {
     let message: String
     var body: some View {
@@ -408,141 +392,103 @@ struct PopupView: View {
     }
 }
 
-// MARK: - Custom Curved Arrow Shapes
-struct CurvedArrowRight: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        // Curva da sinistra verso destra
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10),
-                          control: CGPoint(x: rect.midX, y: rect.minY))
-        // Aggiungi freccia
-        path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - 20))
-        path.move(to: CGPoint(x: rect.maxX - 10, y: rect.midY - 10))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        return path
+// MARK: - Nuove Sheet per le Tendine
+
+struct NonCHoSbattiSheetView: View {
+    // Chiamata al completamento
+    let onDismiss: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Frate, nemmeno io")
+                .font(.custom("Permanent Marker", size: 28))
+                .bold()
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+            Button(action: { onDismiss() }) {
+                Text("Daje")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(30)
     }
 }
 
-struct CurvedArrowLeft: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        // Curva da destra verso sinistra
-        path.move(to: CGPoint(x: rect.maxX, y: rect.midY))
-        path.addQuadCurve(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10),
-                          control: CGPoint(x: rect.midX, y: rect.minY))
-        // Aggiungi freccia
-        path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY - 20))
-        path.move(to: CGPoint(x: rect.minX + 10, y: rect.midY - 10))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
-        return path
+struct ComeFunzionaSheetView: View {
+    let onDismiss: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Frate, ma è una minchiata.. smanetta un po'")
+                .font(.custom("Permanent Marker", size: 28))
+                .bold()
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+            Button(action: { onDismiss() }) {
+                Text("TOP")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(30)
     }
 }
 
-// MARK: - NoNotesPromptView (MODIFICA 3)
-// Questa view viene mostrata se non esiste alcun progetto (currentProject == nil)
-// NOTA: Se c'è un progetto (anche senza note) la view principale mostra l'area note (vuota).
+// MARK: - NoNotesPromptView
 struct NoNotesPromptView: View {
-    // Utilizziamo una binding per mostrare il popup medaglia
-    @Binding var showPopup: Bool
-    @State private var showDropdown: Bool = false
-    
+    // In questo caso il prompt viene mostrato quando non esiste alcun progetto
+    // Il bottone apre la sheet per "Non c'ho sbatti"
+    let onOpenSheet: () -> Void
     var body: some View {
         VStack(spacing: 16) {
-            // Testo in alto
             Text("Dai, datti da fare!")
                 .font(.custom("Permanent Marker", size: 36))
                 .bold()
                 .foregroundColor(.black)
-                .padding(.top, 20)
-            // Freccia sinistra curvilinea posizionata con offset fissi
-            CurvedArrowLeft()
-                .stroke(Color.black, lineWidth: 2)
-                .frame(width: 150, height: 40)
-                .offset(x: -50, y: -10)
-            // Bottone "Non c'ho sbatti"
-            Button(action: {
-                withAnimation {
-                    showDropdown.toggle()
-                }
-            }) {
+                .multilineTextAlignment(.center)
+            Button(action: { onOpenSheet() }) {
                 Text("Non c'ho sbatti")
                     .font(.custom("Permanent Marker", size: 24))
                     .bold()
                     .foregroundColor(.white)
                     .padding()
+                    .frame(maxWidth: .infinity)
                     .background(Color.green)
                     .cornerRadius(8)
-            }
-            // Freccia destra curvilinea (fissa) che punta verso il bottone (ma non lo tocca)
-            CurvedArrowRight()
-                .stroke(Color.black, lineWidth: 2)
-                .frame(width: 150, height: 40)
-                .offset(x: 50, y: -10)
-            
-            if showDropdown {
-                VStack(spacing: 8) {
-                    Text("Frate, nemmeno io")
-                        .font(.custom("Permanent Marker", size: 24))
-                        .bold()
-                        .foregroundColor(.black)
-                    Button(action: {
-                        withAnimation {
-                            showDropdown = false
-                            showPopup = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation { showPopup = false }
-                        }
-                    }) {
-                        Text("Daje")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.green)
-                            .cornerRadius(8)
-                    }
-                }
-                .padding()
-                .background(Color.white)
-                .cornerRadius(10)
             }
         }
         .padding()
     }
 }
 
-// MARK: - HowItWorksDropdownView (MODIFICA 1)
-// Questa view comparirà centrata sullo schermo e utilizza un binding per mostrare il popup
+// MARK: - HowItWorksDropdownView (ora in sheet)
 struct HowItWorksDropdownView: View {
-    @Binding var showPopup: Bool
+    let onDismiss: () -> Void
     var body: some View {
         VStack(spacing: 16) {
             Text("Frate, ma è una minchiata.. smanetta un po'")
-                .font(.custom("Permanent Marker", size: 24))
+                .font(.custom("Permanent Marker", size: 28))
                 .bold()
                 .foregroundColor(.black)
-            Button(action: {
-                withAnimation {
-                    showPopup = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    withAnimation { showPopup = false }
-                }
-            }) {
+                .multilineTextAlignment(.center)
+            Button(action: { onDismiss() }) {
                 Text("TOP")
-                    .font(.title3)
+                    .font(.title2)
                     .foregroundColor(.white)
                     .padding()
+                    .frame(maxWidth: .infinity)
                     .background(Color.green)
                     .cornerRadius(8)
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(10)
+        .padding(30)
     }
 }
 
@@ -551,22 +497,27 @@ struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
     @State private var switchAlert: ActiveAlert? = nil
     @State private var showProjectManager: Bool = false
-    // Stato per il popup della medaglia, usato sia in NoNotesPromptView che in HowItWorksDropdownView
+    // Stato per la sheet "Non c'ho sbatti"
+    @State private var showNonCHoSbattiSheet: Bool = false
+    // Stato per il popup della medaglia
     @State private var showPopup: Bool = false
+    // Utilizziamo AppStorage per ricordare se la medaglia è già stata mostrata
+    @AppStorage("medalAwarded") private var medalAwarded: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
-            // Mostra il prompt solo se non esiste alcun progetto (currentProject == nil)
+            // Se non esiste un progetto corrente, mostriamo il prompt
             let showPrompt = projectManager.currentProject == nil
             
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
                     if showPrompt {
-                        NoNotesPromptView(showPopup: $showPopup)
+                        NoNotesPromptView {
+                            showNonCHoSbattiSheet = true
+                        }
                     } else {
-                        // Anche se il progetto esiste ma senza note, si mostra comunque l'area note (vuota)
                         if let project = projectManager.currentProject {
                             ScrollView {
                                 NoteView(project: project)
@@ -625,14 +576,26 @@ struct ContentView: View {
                     .padding(.bottom, isLandscape ? 0 : 30)
                 }
                 
-                // Popup per la medaglia, visibile se showPopup è true
                 if showPopup {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"\(projectManager.currentProject != nil ? "Sbattimenti zero eh" : "Frate, fattelo venire lo sbatti")\"")
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
                         .transition(.scale)
                 }
             }
             .sheet(isPresented: $showProjectManager) {
                 ProjectManagerView(projectManager: projectManager)
+            }
+            .sheet(isPresented: $showNonCHoSbattiSheet) {
+                NonCHoSbattiSheetView {
+                    // Al dismiss: se la medaglia non è già stata mostrata, la mostriamo e salviamo il flag
+                    if !medalAwarded {
+                        medalAwarded = true
+                        showPopup = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            withAnimation { showPopup = false }
+                        }
+                    }
+                    showNonCHoSbattiSheet = false
+                }
             }
             .alert(item: $switchAlert) { (alert: ActiveAlert) in
                 switch alert {
@@ -817,23 +780,17 @@ struct ProjectManagerView: View {
     @State private var showRenameSheet: Bool = false
     @State private var projectToRename: Project? = nil
     @State private var renameNewName: String = ""
-    // Stati per le deletion sheet.
     @State private var projectForDeletionMain: Project? = nil
     @State private var projectForDeletionBackup: Project? = nil
-    
-    // Stati per la condivisione/importazione.
     @State private var showShareSheet: Bool = false
     @State private var showImportSheet: Bool = false
     @State private var importError: AlertError? = nil
-    
-    // Stato per dati importati in attesa di conferma.
     @State private var pendingImportData: ExportData? = nil
     @State private var showImportConfirmationSheet: Bool = false
-    
-    // Stati per il pulsante "Come funziona l'app"
+    // Stato per la sheet "Come funziona l'app"
+    @State private var showComeFunzionaSheet: Bool = false
+    // Stato per il pulsante nella toolbar
     @State private var showHowItWorksSecondButton: Bool = false
-    @State private var showHowItWorksDropdown: Bool = false
-    @State private var showPopup: Bool = false
 
     var body: some View {
         ZStack {
@@ -944,7 +901,7 @@ struct ProjectManagerView: View {
                         if showHowItWorksSecondButton {
                             Button(action: {
                                 withAnimation {
-                                    showHowItWorksDropdown = true
+                                    showComeFunzionaSheet = true
                                 }
                             }) {
                                 Text("Come funziona l'app")
@@ -1052,23 +1009,11 @@ struct ProjectManagerView: View {
                 }
             } // Fine NavigationView
             
-            // Overlay per il dropdown "Come funziona l'app" centrato
-            if showHowItWorksDropdown {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .edgesIgnoringSafeArea(.all)
-                    HowItWorksDropdownView(showPopup: $showPopup)
-                        .frame(width: 300)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 10)
+            // Sheet per "Come funziona l'app"
+            .sheet(isPresented: $showComeFunzionaSheet) {
+                ComeFunzionaSheetView {
+                    showComeFunzionaSheet = false
                 }
-                .transition(.scale)
-            }
-            // Se il popup della medaglia è attivo, mostrane l'overlay
-            if showPopup {
-                PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
-                    .transition(.scale)
             }
         }
     }
@@ -1077,12 +1022,10 @@ struct ProjectManagerView: View {
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
-    
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: activityItems,
                                    applicationActivities: applicationActivities)
     }
-    
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
