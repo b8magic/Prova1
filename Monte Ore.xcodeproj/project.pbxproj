@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		6F8EA79E2D8B96BA00DC67B0 /* Monte Ore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Monte Ore.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7F1A8B7D2E3F4C5D6E7F8A9B /* PermanentMarker.ttf */ = { isa = PBXFileReference; lastKnownFileType = "file"; path = "MonteOre/PermanentMarker.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -109,6 +110,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F1A8B7D2E3F4C5D6E7F8A9B /* PermanentMarker.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +188,8 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Info.plist";
 			};
 			name = Debug;
 		};
@@ -243,6 +247,8 @@
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Info.plist";
 			};
 			name = Release;
 		};
