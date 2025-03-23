@@ -6,8 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7F1A8B7E2E3F4C5D6E7F8A9C /* PermanentMarker.ttf in Resources */ = { isa = PBXBuildFile; fileRef = 7F1A8B7D2E3F4C5D6E7F8A9B /* PermanentMarker.ttf */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		6F8EA79E2D8B96BA00DC67B0 /* Monte Ore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Monte Ore.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F8EA79E2D8B96BA00DC67B0 /* Monte Ore.app */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Monte Ore.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F1A8B7D2E3F4C5D6E7F8A9B /* PermanentMarker.ttf */ = { isa = PBXFileReference; lastKnownFileType = "file"; path = "MonteOre/PermanentMarker.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -110,7 +114,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7F1A8B7D2E3F4C5D6E7F8A9B /* PermanentMarker.ttf in Resources */,
+				7F1A8B7E2E3F4C5D6E7F8A9C /* PermanentMarker.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
