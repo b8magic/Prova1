@@ -149,20 +149,34 @@ class Project: Identifiable, ObservableObject, Codable {
 
 class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
-    @Published var currentProject: Project?
     @Published var backupProjects: [Project] = []
+    
+    // Persist the last-opened project via UserDefaults.
+    @Published var currentProject: Project? {
+        didSet {
+            if let cp = currentProject {
+                UserDefaults.standard.set(cp.id.uuidString, forKey: "lastProjectId")
+            }
+        }
+    }
     
     private let projectsFileName = "projects.json"
     
     init() {
         loadProjects()
         loadBackupProjects()
+        // Try to load the last opened project if it exists.
+        if let lastId = UserDefaults.standard.string(forKey: "lastProjectId"),
+           let lastProject = projects.first(where: { $0.id.uuidString == lastId }) {
+            self.currentProject = lastProject
+        } else {
+            self.currentProject = projects.first
+        }
+        
         if projects.isEmpty {
             self.projects = []
             self.currentProject = nil
             saveProjects()
-        } else {
-            self.currentProject = projects.first
         }
     }
     
@@ -416,17 +430,23 @@ struct NonCHoSbattiSheetView: View {
     }
 }
 
+// Updated ComeFunzionaSheetView with new centered text
 struct ComeFunzionaSheetView: View {
     let onDismiss: () -> Void
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Frate, ma è una minchiata.. smanetta un po'")
-                .font(.custom("Permanent Marker", size: 28))
-                .bold()
-                .foregroundColor(.black)
+        VStack {
+            Text("""
+Se un'attività supera la mezzanotte, al momento di pigiarne il termine l'app creerà un nuovo giorno. Basterá modificare la nota col pulsante in alto a destra, e inserire un termine di fine orario che fuoriesca le 24. Ad esempio, se l'attività si è conclusa all'1:29, si inserisca 25:29.
+
+Ogni singola attività o task puó avere una sua nota, per differenziare tipologie di lavori o attività differenti all'interno di uno stesso progetto. In tal caso si consiglia di denominare le note "NomeProgetto NomeAttività".
+
+L'uso dell'app è flessibile e adattabile alle proprie esigenze.
+""")
                 .multilineTextAlignment(.center)
+                .padding()
+                .font(.custom("Permanent Marker", size: 20))
             Button(action: { onDismiss() }) {
-                Text("Mh")
+                Text("Chiudi")
                     .font(.title2)
                     .foregroundColor(.white)
                     .padding()
@@ -502,7 +522,8 @@ struct ContentView: View {
                     } else {
                         if let project = projectManager.currentProject {
                             ScrollView {
-                                NoteView(project: project)
+                                // Pass both project and projectManager to NoteView
+                                NoteView(project: project, projectManager: projectManager)
                                     .padding()
                             }
                             .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
@@ -657,6 +678,7 @@ struct ContentView: View {
 
 struct NoteView: View {
     @ObservedObject var project: Project
+    var projectManager: ProjectManager
     @State private var editMode: Bool = false
     @State private var editedRows: [NoteRow] = []
     
@@ -677,6 +699,7 @@ struct NoteView: View {
                         Button("Salva") {
                             project.noteRows = editedRows
                             editMode = false
+                            projectManager.saveProjects()
                         }
                         .foregroundColor(.blue)
                         Button("Annulla") {
