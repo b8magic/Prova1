@@ -327,7 +327,6 @@ struct LabelAssignmentView: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
     @Environment(\.presentationMode) var presentationMode
-    
     var body: some View {
         NavigationView {
             List {
@@ -385,10 +384,11 @@ struct ProjectModificationSheet: View {
     @State private var showLabelAssignSheet = false
     @State private var showDeleteSheet = false
     var body: some View {
-        VStack(spacing: 30) {
+        // Bottoni disposti in orizzontale
+        HStack(spacing: 10) {
             Button(action: { showRenameSheet = true }) {
                 Text("Rinomina")
-                    .font(.title2)
+                    .font(.title3)
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
@@ -396,8 +396,9 @@ struct ProjectModificationSheet: View {
                     .cornerRadius(8)
             }
             Button(action: { showLabelAssignSheet = true }) {
-                Text("Applica o revoca etichetta")
-                    .font(.title2)
+                Text("Applica o\nrevoca etichetta")
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
@@ -406,17 +407,13 @@ struct ProjectModificationSheet: View {
             }
             Button(action: { showDeleteSheet = true }) {
                 Text("Elimina")
-                    .font(.title2)
+                    .font(.title3)
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
                     .background(Color.red)
                     .cornerRadius(8)
             }
-            Button("Chiudi") {
-                presentationMode.wrappedValue.dismiss()
-            }
-            .padding(.top, 20)
         }
         .padding()
         .sheet(isPresented: $showRenameSheet) {
@@ -519,23 +516,31 @@ struct ProjectRowView: View {
     @State private var isHighlighted: Bool = false
     @State private var showModificationSheet: Bool = false
     var body: some View {
-        HStack {
-            Text(project.name)
-                .onTapGesture {
-                    withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        withAnimation(.easeOut(duration: 0.2)) { isHighlighted = false }
-                        projectManager.currentProject = project
-                    }
+        // Divido la riga in due aree: a sinistra il tappabile per aprire il progetto, a destra il bottone "Modifica"
+        HStack(spacing: 0) {
+            Button(action: {
+                withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.easeOut(duration: 0.2)) { isHighlighted = false }
+                    projectManager.currentProject = project
                 }
-            Spacer()
+            }) {
+                HStack {
+                    Text(project.name)
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+            }
+            .buttonStyle(PlainButtonStyle())
+            Divider().frame(width: 1).background(Color.gray)
             Button("Modifica") {
                 showModificationSheet = true
             }
             .foregroundColor(.blue)
-            .padding(.leading, 8)
+            .padding(.horizontal, 10)
         }
-        .padding(.vertical, 4)
         .background(
             isHighlighted ?
                 (project.labelID.flatMap { id in projectManager.labels.first(where: { $0.id == id }) }?.color ?? "#D3D3D3")
@@ -565,7 +570,9 @@ struct LabelHeaderView: View {
                 .underline()
                 .foregroundColor(Color(hex: label.color))
             Spacer()
-            if !isBackup {
+            // Mostriamo il lucchetto solo se esistono progetti assegnati a questa etichetta e se non siamo nella sezione backup
+            if !isBackup,
+               projectManager.projects.contains(where: { $0.labelID == label.id }) {
                 Button(action: {
                     if projectManager.lockedLabelID != label.id {
                         projectManager.lockedLabelID = label.id
@@ -607,6 +614,7 @@ struct LabelHeaderView: View {
                                 if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
                                     projectManager.projects[index].labelID = label.id
                                     projectManager.saveProjects()
+                                    print("Progetto aggiornato con etichetta \(label.title)")
                                 }
                             }
                         }
@@ -719,14 +727,12 @@ struct LabelsManagerView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var newLabelTitle: String = ""
     @State private var newLabelColor: Color = .black
-    
     @State private var showRenameSheet: Bool = false
     @State private var showDeleteSheet: Bool = false
     @State private var showChangeColorSheet: Bool = false
     @State private var selectedLabel: ProjectLabel? = nil
     @State private var renameText: String = ""
     @State private var selectedColor: Color = .black
-    
     var body: some View {
         NavigationView {
             VStack {
@@ -1200,7 +1206,7 @@ struct ProjectManagerView: View {
         NavigationView {
             VStack {
                 List {
-                    // Sezione Progetti Correnti (raggruppati per etichetta)
+                    // Sezione Progetti Correnti raggruppati per etichetta
                     Section(header: Text("Progetti Correnti").font(.largeTitle).bold()) {
                         let unlabeled = projectManager.projects.filter { $0.labelID == nil }
                         if !unlabeled.isEmpty {
@@ -1209,17 +1215,31 @@ struct ProjectManagerView: View {
                             }
                         }
                         ForEach(projectManager.labels) { label in
-                            LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
                             let projectsForLabel = projectManager.projects.filter { $0.labelID == label.id }
-                            ForEach(projectsForLabel) { project in
-                                ProjectRowView(project: project, projectManager: projectManager)
+                            if !projectsForLabel.isEmpty {
+                                LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
+                                ForEach(projectsForLabel) { project in
+                                    ProjectRowView(project: project, projectManager: projectManager)
+                                }
                             }
                         }
                     }
-                    // Sezione Mensilità Passate: visualizziamo solo i progetti, senza raggruppamento
+                    // Sezione Mensilità Passate: raggruppa per etichetta solo se ci sono progetti
                     Section(header: Text("Mensilità Passate").font(.largeTitle).bold()) {
-                        ForEach(projectManager.backupProjects) { project in
-                            ProjectRowView(project: project, projectManager: projectManager)
+                        let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
+                        if !unlabeled.isEmpty {
+                            ForEach(unlabeled) { project in
+                                ProjectRowView(project: project, projectManager: projectManager)
+                            }
+                        }
+                        ForEach(projectManager.labels) { label in
+                            let backupForLabel = projectManager.backupProjects.filter { $0.labelID == label.id }
+                            if !backupForLabel.isEmpty {
+                                LabelHeaderView(label: label, projectManager: projectManager, isBackup: true)
+                                ForEach(backupForLabel) { project in
+                                    ProjectRowView(project: project, projectManager: projectManager)
+                                }
+                            }
                         }
                     }
                 }
