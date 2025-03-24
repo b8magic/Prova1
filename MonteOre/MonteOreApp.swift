@@ -1365,9 +1365,6 @@ struct ContentView: View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
             let showPrompt = projectManager.currentProject == nil
-            let isBackupProject = projectManager.currentProject.flatMap { proj in
-                projectManager.backupProjects.first(where: { $0.id == proj.id })
-            } != nil
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
