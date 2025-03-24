@@ -297,13 +297,14 @@ class ProjectManager: ObservableObject {
     }
 }
 
-// MARK: - Export & Import
+// MARK: - ExportData
 struct ExportData: Codable {
     let projects: [Project]
     let backupProjects: [Project]
     let labels: [ProjectLabel]
     let lockedLabelID: String?
 }
+
 extension ProjectManager {
     func getExportURL() -> URL? {
         let exportData = ExportData(
@@ -322,7 +323,6 @@ extension ProjectManager {
 }
 
 // MARK: - LabelAssignmentView
-// (Definizione spostata in alto per essere visibile a tutti)
 struct LabelAssignmentView: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -366,7 +366,7 @@ struct LabelAssignmentView: View {
     }
 }
 
-// MARK: - ActivityView (Singola definizione)
+// MARK: - ActivityView
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
@@ -376,7 +376,7 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// MARK: - ProjectModificationSheet (Modifica progetto)
+// MARK: - ProjectModificationSheet
 struct ProjectModificationSheet: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -1364,7 +1364,7 @@ struct ProjectManagerView: View {
     }
 }
 
-// MARK: - Export & Import Structures (già definiti sopra)
+// MARK: - ImportConfirmationView
 struct ImportConfirmationView: View {
     let message: String
     let importAction: () -> Void
@@ -1396,14 +1396,6 @@ struct ImportConfirmationView: View {
         }
         .padding()
     }
-}
-
-// MARK: - ExportData Structure
-struct ExportData: Codable {
-    let projects: [Project]
-    let backupProjects: [Project]
-    let labels: [ProjectLabel]
-    let lockedLabelID: String?
 }
 
 // MARK: - App Main
