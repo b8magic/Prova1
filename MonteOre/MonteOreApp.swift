@@ -20,10 +20,10 @@ extension Color {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(.sRGB,
-                  red: Double(r) / 255,
-                  green: Double(g) / 255,
-                  blue: Double(b) / 255,
-                  opacity: Double(a) / 255)
+                  red: Double(r)/255,
+                  green: Double(g)/255,
+                  blue: Double(b)/255,
+                  opacity: Double(a)/255)
     }
 }
 
@@ -31,7 +31,7 @@ extension UIColor {
     var toHex: String {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         self.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+        return String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
     }
 }
 
@@ -177,6 +177,7 @@ class ProjectManager: ObservableObject {
     }
     
     // MARK: Projects
+    
     func addProject(name: String) {
         let p = Project(name: name)
         projects.append(p)
@@ -185,12 +186,14 @@ class ProjectManager: ObservableObject {
         objectWillChange.send()
         NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
+    
     func renameProject(project: Project, newName: String) {
         project.name = newName
         saveProjects()
         objectWillChange.send()
         NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
+    
     func deleteProject(project: Project) {
         if let idx = projects.firstIndex(where: { $0.id == project.id }) {
             projects.remove(at: idx)
@@ -202,6 +205,7 @@ class ProjectManager: ObservableObject {
     }
     
     // MARK: Backup
+    
     func deleteBackupProject(project: Project) {
         let url = getURLForBackup(project: project)
         try? FileManager.default.removeItem(at: url)
@@ -209,20 +213,24 @@ class ProjectManager: ObservableObject {
             backupProjects.remove(at: idx)
         }
     }
+    
     func isProjectRunning(_ project: Project) -> Bool {
         if let lastRow = project.noteRows.last { return lastRow.orari.hasSuffix("-") }
         return false
     }
+    
     func getProjectsFileURL() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent(projectsFileName)
     }
+    
     func saveProjects() {
         do {
             let data = try JSONEncoder().encode(projects)
             try data.write(to: getProjectsFileURL())
         } catch { print("Error saving projects: \(error)") }
     }
+    
     func loadProjects() {
         let url = getProjectsFileURL()
         if let data = try? Data(contentsOf: url),
@@ -230,10 +238,12 @@ class ProjectManager: ObservableObject {
             projects = saved
         }
     }
+    
     func getURLForBackup(project: Project) -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("\(project.name).json")
     }
+    
     func backupCurrentProjectIfNeeded(_ project: Project, currentDate: Date, currentGiorno: String) {
         if let lastRow = project.noteRows.last,
            lastRow.giorno != currentGiorno,
@@ -260,6 +270,7 @@ class ProjectManager: ObservableObject {
             }
         }
     }
+    
     func loadBackupProjects() {
         backupProjects = []
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -277,6 +288,7 @@ class ProjectManager: ObservableObject {
     }
     
     // MARK: Labels Management
+    
     func addLabel(title: String, color: String) {
         let l = ProjectLabel(title: title, color: color)
         labels.append(l)
@@ -284,6 +296,7 @@ class ProjectManager: ObservableObject {
         objectWillChange.send()
         NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
+    
     func renameLabel(label: ProjectLabel, newTitle: String) {
         if let idx = labels.firstIndex(where: { $0.id == label.id }) {
             labels[idx].title = newTitle
@@ -292,6 +305,7 @@ class ProjectManager: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         }
     }
+    
     func deleteLabel(label: ProjectLabel) {
         labels.removeAll(where: { $0.id == label.id })
         for p in projects { if p.labelID == label.id { p.labelID = nil } }
@@ -302,6 +316,7 @@ class ProjectManager: ObservableObject {
         if lockedLabelID == label.id { lockedLabelID = nil }
         NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
+    
     func saveLabels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let url = docs.appendingPathComponent("labels.json")
@@ -310,6 +325,7 @@ class ProjectManager: ObservableObject {
             try data.write(to: url)
         } catch { print("Errore saving labels: \(error)") }
     }
+    
     func loadLabels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let url = docs.appendingPathComponent("labels.json")
@@ -320,6 +336,7 @@ class ProjectManager: ObservableObject {
     }
     
     // MARK: Reordering Projects per Group
+    
     func moveProjects(forLabel labelID: UUID?, indices: IndexSet, newOffset: Int) {
         var group = projects.filter { $0.labelID == labelID }
         group.move(fromOffsets: indices, toOffset: newOffset)
@@ -354,7 +371,7 @@ extension ProjectManager {
     }
 }
 
-// MARK: - ImportConfirmationView
+// MARK: ImportConfirmationView
 
 struct ImportConfirmationView: View {
     let message: String
@@ -393,14 +410,14 @@ struct ImportConfirmationView: View {
     }
 }
 
-// MARK: - ComeFunzionaSheetView
+// MARK: ComeFunzionaSheetView
 
 struct ComeFunzionaSheetView: View {
     let onDismiss: () -> Void
     var body: some View {
         VStack {
             Text("""
-Se un'attività supera la mezzanotte, al termine l'app creerà un nuovo giorno. Modifica la nota con il pulsante in alto a destra e inserisci un orario oltre le 24 (es. 25:29) per registrare l'attività che si estende oltre la mezzanotte.
+Se un'attività supera la mezzanotte, al termine l'app creerà un nuovo giorno. Modifica la nota col pulsante in alto a destra e inserisci un orario oltre le 24 (es. 25:29) per registrare l'attività che si estende oltre la mezzanotte.
             
 Ogni attività può avere una nota per differenziare tipologie di lavoro. Si consiglia di usare il formato: NomeProgetto NomeAttività.
 """)
@@ -421,7 +438,7 @@ Ogni attività può avere una nota per differenziare tipologie di lavoro. Si con
     }
 }
 
-// MARK: - LabelAssignmentView
+// MARK: LabelAssignmentView
 
 struct LabelAssignmentView: View {
     @ObservedObject var project: Project
@@ -481,7 +498,7 @@ struct LabelAssignmentView: View {
     }
 }
 
-// MARK: - ActivityView
+// MARK: ActivityView
 
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
@@ -492,7 +509,7 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// MARK: - CombinedProjectEditSheet
+// MARK: CombinedProjectEditSheet
 
 struct CombinedProjectEditSheet: View {
     @ObservedObject var project: Project
@@ -556,7 +573,7 @@ struct CombinedProjectEditSheet: View {
     }
 }
 
-// MARK: - ProjectEditToggleButton
+// MARK: ProjectEditToggleButton
 
 struct ProjectEditToggleButton: View {
     @Binding var isEditing: Bool
@@ -570,7 +587,7 @@ struct ProjectEditToggleButton: View {
     }
 }
 
-// MARK: - ProjectRowView
+// MARK: ProjectRowView
 
 struct ProjectRowView: View {
     @ObservedObject var project: Project
@@ -618,7 +635,7 @@ struct ProjectRowView: View {
     }
 }
 
-// MARK: - NoteView (Main Note Content)
+// MARK: NoteView (Main Content)
 
 struct NoteView: View {
     @ObservedObject var project: Project
@@ -669,7 +686,7 @@ struct NoteView: View {
     }
 }
 
-// MARK: - LabelHeaderView
+// MARK: LabelHeaderView
 
 struct LabelHeaderView: View {
     let label: ProjectLabel
@@ -764,7 +781,7 @@ struct LabelHeaderView: View {
     }
 }
 
-// MARK: - LabelsManagerView & Wrappers
+// MARK: LabelsManagerView and Wrappers
 
 enum LabelActionType: Identifiable {
     case rename(label: ProjectLabel, initialText: String)
@@ -998,6 +1015,66 @@ struct ChangeLabelColorDirectSheet: View {
     }
 }
 
+// MARK: - ProjectManagerListView (Extracted List Subview)
+
+struct ProjectManagerListView: View {
+    @ObservedObject var projectManager: ProjectManager
+    var editingProjects: Bool
+    var body: some View {
+        List {
+            Section(header:
+                        Text("Progetti Correnti")
+                            .font(.largeTitle)
+                            .bold()
+                            .padding(.top, 10)) {
+                let unlabeled = projectManager.projects.filter { $0.labelID == nil }
+                if !unlabeled.isEmpty {
+                    ForEach(unlabeled) { project in
+                        ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
+                    }
+                    .onMove { indices, newOffset in
+                        projectManager.moveProjects(forLabel: nil, indices: indices, newOffset: newOffset)
+                    }
+                }
+                ForEach(projectManager.labels) { label in
+                    LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
+                    let projectsForLabel = projectManager.projects.filter { $0.labelID == label.id }
+                    if !projectsForLabel.isEmpty {
+                        ForEach(projectsForLabel) { project in
+                            ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
+                        }
+                        .onMove { indices, newOffset in
+                            projectManager.moveProjects(forLabel: label.id, indices: indices, newOffset: newOffset)
+                        }
+                    }
+                }
+            }
+            Section(header:
+                        Text("Mensilità Passate")
+                            .font(.largeTitle)
+                            .bold()
+                            .padding(.top, 40)) {
+                let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
+                if !unlabeled.isEmpty {
+                    ForEach(unlabeled) { project in
+                        ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
+                    }
+                }
+                ForEach(projectManager.labels) { label in
+                    let backupForLabel = projectManager.backupProjects.filter { $0.labelID == label.id }
+                    if !backupForLabel.isEmpty {
+                        LabelHeaderView(label: label, projectManager: projectManager, isBackup: true)
+                        ForEach(backupForLabel) { project in
+                            ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(PlainListStyle())
+    }
+}
+
 // MARK: - ProjectManagerView
 
 struct ProjectManagerView: View {
@@ -1016,58 +1093,7 @@ struct ProjectManagerView: View {
     var body: some View {
         NavigationView {
             VStack {
-                List {
-                    Section(header:
-                                Text("Progetti Correnti")
-                                    .font(.largeTitle)
-                                    .bold()
-                                    .padding(.top, 10)) {
-                        let unlabeled = projectManager.projects.filter { $0.labelID == nil }
-                        if !unlabeled.isEmpty {
-                            ForEach(unlabeled) { project in
-                                ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
-                            }
-                            .onMove { indices, newOffset in
-                                projectManager.moveProjects(forLabel: nil, indices: indices, newOffset: newOffset)
-                            }
-                        }
-                        ForEach(projectManager.labels) { label in
-                            LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
-                            let projectsForLabel = projectManager.projects.filter { $0.labelID == label.id }
-                            if !projectsForLabel.isEmpty {
-                                ForEach(projectsForLabel) { project in
-                                    ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
-                                }
-                                .onMove { indices, newOffset in
-                                    projectManager.moveProjects(forLabel: label.id, indices: indices, newOffset: newOffset)
-                                }
-                            }
-                        }
-                    }
-                    Section(header:
-                                Text("Mensilità Passate")
-                                    .font(.largeTitle)
-                                    .bold()
-                                    .padding(.top, 40)) {
-                        let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
-                        if !unlabeled.isEmpty {
-                            ForEach(unlabeled) { project in
-                                ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
-                            }
-                        }
-                        ForEach(projectManager.labels) { label in
-                            let backupForLabel = projectManager.backupProjects.filter { $0.labelID == label.id }
-                            if !backupForLabel.isEmpty {
-                                LabelHeaderView(label: label, projectManager: projectManager, isBackup: true)
-                                ForEach(backupForLabel) { project in
-                                    ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
-                                }
-                            }
-                        }
-                    }
-                }
-                .listStyle(PlainListStyle())
-                .environment(\.editMode, $editMode)
+                ProjectManagerListView(projectManager: projectManager, editingProjects: editingProjects)
                 HStack {
                     TextField("Nuovo progetto", text: $newProjectName)
                         .font(.title3)
