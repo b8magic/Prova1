@@ -20,10 +20,24 @@ extension Color {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(.sRGB,
-                  red: Double(r)/255,
-                  green: Double(g)/255,
-                  blue: Double(b)/255,
-                  opacity: Double(a)/255)
+                  red: Double(r) / 255,
+                  green: Double(g) / 255,
+                  blue: Double(b) / 255,
+                  opacity: Double(a) / 255)
+    }
+}
+
+// MARK: - PopupView
+struct PopupView: View {
+    let message: String
+    var body: some View {
+        Text(message)
+            .font(.headline)
+            .foregroundColor(.white)
+            .padding()
+            .background(Color.black.opacity(0.8))
+            .cornerRadius(10)
+            .shadow(radius: 10)
     }
 }
 
@@ -115,7 +129,7 @@ class Project: Identifiable, ObservableObject, Codable {
     var id = UUID()
     @Published var name: String
     @Published var noteRows: [NoteRow]
-    @Published var labelID: UUID? // New: optional label
+    @Published var labelID: UUID? // New: optional label assignment
     
     enum CodingKeys: CodingKey {
         case id, name, noteRows, labelID
@@ -166,8 +180,16 @@ class Project: Identifiable, ObservableObject, Codable {
 class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
     @Published var backupProjects: [Project] = []
-    @Published var labels: [ProjectLabel] = [] // New labels list
-    @Published var lockedLabel: UUID? = nil   // If non-nil, the current locked label
+    @Published var labels: [ProjectLabel] = [] // List of labels
+    @Published var lockedLabel: UUID? {         // Locked label is now persisted
+        didSet {
+            if let locked = lockedLabel {
+                UserDefaults.standard.set(locked.uuidString, forKey: "lockedLabel")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "lockedLabel")
+            }
+        }
+    }
     
     // Persist the last-opened project via UserDefaults.
     @Published var currentProject: Project? {
@@ -185,6 +207,13 @@ class ProjectManager: ObservableObject {
         loadProjects()
         loadBackupProjects()
         loadLabels()
+        // Load lockedLabel from UserDefaults
+        if let lockedString = UserDefaults.standard.string(forKey: "lockedLabel"),
+           let uuid = UUID(uuidString: lockedString) {
+            self.lockedLabel = uuid
+        } else {
+            self.lockedLabel = nil
+        }
         // Try to load the last opened project if it exists.
         if let lastId = UserDefaults.standard.string(forKey: "lastProjectId"),
            let lastProject = projects.first(where: { $0.id.uuidString == lastId }) {
@@ -358,7 +387,7 @@ class ProjectManager: ObservableObject {
     
     func deleteLabel(label: ProjectLabel) {
         labels.removeAll { $0.id == label.id }
-        // Also remove label from any projects that had it.
+        // Remove label from projects that had it.
         for project in projects {
             if project.labelID == label.id {
                 project.labelID = nil
@@ -368,7 +397,7 @@ class ProjectManager: ObservableObject {
         saveProjects()
     }
     
-    // Return the list of projects for current months, possibly filtered by locked label.
+    // Return the list of current projects (filtered by locked label if set)
     func currentProjects() -> [Project] {
         if let lock = lockedLabel {
             return projects.filter { $0.labelID == lock }
@@ -379,7 +408,7 @@ class ProjectManager: ObservableObject {
     
     // Cycle through projects; if lockedLabel is set, only cycle those.
     func cycleProject() {
-        var available = currentProjects()
+        let available = currentProjects()
         guard let current = currentProject, !available.isEmpty else { return }
         if !available.contains(where: { $0.id == current.id }) {
             currentProject = available.first
@@ -417,7 +446,7 @@ extension ProjectManager {
 
 // MARK: - Views
 
-// View for modifying a project (showing options: Rename, Label, Delete)
+// View for modifying a project (options: Rename, Label assignment, Delete)
 struct ProjectModificationSheet: View {
     let project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -469,6 +498,7 @@ struct ProjectModificationSheet: View {
                         ])
         }
         .sheet(isPresented: $showLabelAssign) {
+            // Notice the order: project first, then projectManager
             LabelAssignmentView(project: project, projectManager: projectManager, isPresented: $showLabelAssign)
         }
         .sheet(isPresented: $showDeleteConfirm) {
@@ -480,10 +510,10 @@ struct ProjectModificationSheet: View {
     }
 }
 
-// View for assigning a label to a project
+// View for assigning a label to a project; note the parameter order
 struct LabelAssignmentView: View {
-    @ObservedObject var projectManager: ProjectManager
     @ObservedObject var project: Project
+    @ObservedObject var projectManager: ProjectManager
     @Binding var isPresented: Bool
     @State private var selectedLabelID: UUID?
     
@@ -525,7 +555,7 @@ struct LabelAssignmentView: View {
     }
 }
 
-// Delete Confirmation View (same as before)
+// Delete Confirmation View
 struct DeleteConfirmationView: View {
     let projectName: String
     let deleteAction: () -> Void
@@ -595,7 +625,7 @@ struct LabelManagerView: View {
                     ForEach(projectManager.labels) { label in
                         HStack {
                             Button(action: {
-                                // When tapping the color circle, show a ColorPicker inline
+                                // Optionally add a ColorPicker inline here.
                             }) {
                                 Circle()
                                     .fill(Color(hex: label.colorHex))
@@ -656,15 +686,15 @@ struct LabelManagerView: View {
     }
 }
 
-// Extension to convert Color to hex string (approximate)
+// Extension to convert Color to HEX string
 extension Color {
     func toHex() -> String? {
         #if canImport(UIKit)
         let uiColor = UIColor(self)
         var r: CGFloat = 0; var g: CGFloat = 0; var b: CGFloat = 0; var a: CGFloat = 0
         if uiColor.getRed(&r, green: &g, blue: &b, alpha: &a) {
-            let rgb = (Int)(r*255)<<16 | (Int)(g*255)<<8 | (Int)(b*255)
-            return String(format:"#%06x", rgb)
+            let rgb = (Int)(r * 255) << 16 | (Int)(g * 255) << 8 | (Int)(b * 255)
+            return String(format: "#%06x", rgb)
         }
         #endif
         return nil
@@ -681,7 +711,7 @@ struct ContentView: View {
     @State private var showLabelManager: Bool = false
     @State private var projectModificationFor: Project? = nil
     @State private var showLockInfo: Bool = false
-    // Usiamo AppStorage per mostrare la medaglia una sola volta
+    // Using AppStorage to show the medal only once
     @AppStorage("medalAwarded") private var medalAwarded: Bool = false
 
     var body: some View {
@@ -691,13 +721,13 @@ struct ContentView: View {
             ZStack {
                 Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
-                    // Title for Gestione: now split into two sections.
+                    // Titles for current projects
                     Text("Progetti correnti")
                         .font(.largeTitle)
                         .bold()
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            // First, show projects without label
+                            // Projects without label
                             if currentUnlabeledProjects().count > 0 {
                                 Text("Senza etichetta")
                                     .font(.title2)
@@ -706,7 +736,7 @@ struct ContentView: View {
                                     projectRow(project: project)
                                 }
                             }
-                            // Then, for each label group:
+                            // Group projects by label
                             ForEach(projectManager.labels) { label in
                                 let projectsForLabel = currentProjects(for: label)
                                 if projectsForLabel.count > 0 {
@@ -716,9 +746,7 @@ struct ContentView: View {
                                             .underline()
                                             .foregroundColor(Color(hex: label.colorHex))
                                         Spacer()
-                                        // Show a lock icon if unlocked
                                         Button(action: {
-                                            // Toggle lock for this label
                                             if projectManager.lockedLabel == label.id {
                                                 projectManager.lockedLabel = nil
                                             } else {
@@ -743,7 +771,7 @@ struct ContentView: View {
                         .font(.largeTitle)
                         .bold()
                     
-                    // For simplicity, list backupProjects (grouping similar to above can be done similarly)
+                    // Backup projects list
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             ForEach(projectManager.backupProjects) { project in
@@ -758,7 +786,6 @@ struct ContentView: View {
                     // Main Buttons Row
                     HStack(spacing: 20) {
                         Button(action: {
-                            // Show project management view
                             showProjectManager = true
                         }) {
                             Text("Gestione progetti")
@@ -781,7 +808,7 @@ struct ContentView: View {
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.black)
                                 .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color(hex: "#F7CE46"))) // Ocra yellow
+                                .background(Circle().fill(Color(hex: "#F7CE46")))
                                 .overlay(Circle().stroke(Color.black, lineWidth: 2))
                         }
                         .background(Color(hex: "#54c0ff"))
@@ -790,7 +817,7 @@ struct ContentView: View {
                     .padding(.horizontal, isLandscape ? 10 : 30)
                     .padding(.bottom, isLandscape ? 0 : 30)
                     
-                    // Bottom row: "Pigia il tempo" button
+                    // "Pigia il tempo" button
                     Button(action: {
                         mainButtonTapped()
                     }) {
@@ -803,7 +830,6 @@ struct ContentView: View {
                     .disabled(projectManager.currentProject == nil)
                 }
                 
-                // Overlays for popup, project modification, lock info
                 if let project = projectModificationFor {
                     ProjectModificationSheet(project: project, projectManager: projectManager, isPresented: Binding(get: {
                         self.projectModificationFor != nil
@@ -848,7 +874,6 @@ struct ContentView: View {
                                  secondaryButton: .cancel())
                 }
             }
-            // If a label is locked, show the lock info popup
             .sheet(isPresented: $showLockInfo) {
                 if let lockedID = projectManager.lockedLabel,
                    let label = projectManager.labels.first(where: { $0.id == lockedID }) {
@@ -861,7 +886,7 @@ struct ContentView: View {
         }
     }
     
-    // Helper functions to group projects by label
+    // Helper functions
     func currentUnlabeledProjects() -> [Project] {
         projectManager.currentProjects().filter { $0.labelID == nil }
     }
@@ -870,7 +895,6 @@ struct ContentView: View {
         projectManager.currentProjects().filter { $0.labelID == label.id }
     }
     
-    // A row for a project: shows its name and a "Modifica" button
     @ViewBuilder
     func projectRow(project: Project) -> some View {
         HStack {
@@ -1031,7 +1055,6 @@ struct ProjectManagerView: View {
                     Section(header: Text("Progetti correnti")
                                 .font(.largeTitle)
                                 .bold()) {
-                        // Show projects in a simple list (or you could embed the grouping here as well)
                         ForEach(projectManager.projects) { project in
                             HStack {
                                 Button(action: {
@@ -1084,7 +1107,7 @@ struct ProjectManagerView: View {
                             .padding(8)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
                     }
-                    // New button for labels (Etichette)
+                    // New button for labels ("Etichette")
                     Button(action: {
                         showLabelManager = true
                     }) {
@@ -1098,10 +1121,7 @@ struct ProjectManagerView: View {
                 .padding()
                 
                 Button(action: {
-                    if let exportURL = projectManager.getExportURL() {
-                        // Show share sheet (use ActivityView as before)
-                        // For simplicity, we use a temporary sheet here.
-                    }
+                    // For sharing, code to present ActivityView can be added here.
                 }) {
                     Text("Condividi Monte Ore")
                         .font(.title3)
@@ -1112,7 +1132,7 @@ struct ProjectManagerView: View {
                 .padding(.bottom, 10)
                 
                 Button(action: {
-                    // Import file action (handled with fileImporter in ContentView)
+                    // Import file action – handled in ContentView.
                 }) {
                     Text("Importa File")
                         .font(.title3)
@@ -1126,7 +1146,7 @@ struct ProjectManagerView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Chiudi") {
-                        // Dismiss the ProjectManagerView
+                        // Dismiss action (to be provided by parent)
                     }
                 }
             }
