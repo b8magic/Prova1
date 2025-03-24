@@ -96,7 +96,7 @@ struct NoteRow: Identifiable, Codable {
 struct ProjectLabel: Identifiable, Codable {
     var id = UUID()
     var title: String
-    var color: String    // e.g. "#FF0000"
+    var color: String   // e.g. "#FF0000"
 }
 
 class Project: Identifiable, ObservableObject, Codable {
@@ -137,7 +137,6 @@ class Project: Identifiable, ObservableObject, Codable {
     }
 }
 
-// MARK: - ProjectManager
 class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
     @Published var backupProjects: [Project] = []
@@ -318,7 +317,7 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // MARK: - Reordering Projects per Group
+    // MARK: - Reordering Projects (per group)
     func moveProjects(forLabel labelID: UUID?, indices: IndexSet, newOffset: Int) {
         var group = projects.filter { $0.labelID == labelID }
         group.move(fromOffsets: indices, toOffset: newOffset)
@@ -472,7 +471,7 @@ struct CombinedProjectEditSheet: View {
                 }
                 .alert(isPresented: $showDeleteConfirmation) {
                     Alert(title: Text("Elimina progetto"),
-                          message: Text("Sei sicuro di voler eliminare il progetto \"\(project.name)\"?"),
+                          message: Text("Sei sicuro di voler eliminare il progetto \(project.name) ?"),
                           primaryButton: .destructive(Text("Elimina"), action: {
                             projectManager.deleteProject(project: project)
                             presentationMode.wrappedValue.dismiss()
@@ -498,7 +497,7 @@ struct ProjectEditToggleButton: View {
     }
 }
 
-// MARK: - ProjectRowView (Tappable areas)
+// MARK: - ProjectRowView (Separate tappable areas)
 struct ProjectRowView: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -507,7 +506,6 @@ struct ProjectRowView: View {
     @State private var showSecondarySheet = false
     var body: some View {
         HStack(spacing: 0) {
-            // Left area opens the project
             Button(action: {
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -516,27 +514,31 @@ struct ProjectRowView: View {
                 }
             }) {
                 HStack {
+                    // If project has a label, underline the name and color it with label color.
+                    let labelColor = projectManager.labels.first(where: { $0.id == project.labelID })?.color ?? "#000000"
                     Text(project.name)
-                        .foregroundColor(.primary)
+                        .underline()
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(hex: labelColor))
                     Spacer()
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
             }
             .buttonStyle(PlainButtonStyle())
             Divider().frame(width: 1).background(Color.gray)
-            // Right area: if editing, show "Rinomina o Elimina"; else, show "Etichetta"
-            Button(action: {
-                showSecondarySheet = true
-            }) {
+            Button(action: { showSecondarySheet = true }) {
                 Text(editingProjects ? "Rinomina o Elimina" : "Etichetta")
-                    .font(.footnote)
+                    .font(.system(size: 16))
                     .foregroundColor(.blue)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 10)
             }
         }
-        .background(isHighlighted ? Color.gray.opacity(0.3) : Color.clear)
+        .background(
+            // If project is running, show yellow background.
+            projectManager.isProjectRunning(project) ? Color.yellow : (isHighlighted ? Color.gray.opacity(0.3) : Color.clear)
+        )
         .sheet(isPresented: $showSecondarySheet) {
             if editingProjects {
                 CombinedProjectEditSheet(project: project, projectManager: projectManager)
@@ -548,7 +550,7 @@ struct ProjectRowView: View {
     }
 }
 
-// MARK: - LabelHeaderView (Drag & Drop target)
+// MARK: - LabelHeaderView (Drag & Drop and Lock)
 struct LabelHeaderView: View {
     let label: ProjectLabel
     @ObservedObject var projectManager: ProjectManager
@@ -583,7 +585,9 @@ struct LabelHeaderView: View {
                 .buttonStyle(PlainButtonStyle())
                 .popover(isPresented: $showLockInfo, arrowEdge: .bottom) {
                     VStack(spacing: 20) {
-                        Text("Il pulsante è agganciato ai progetti dell'etichetta \"\(label.title)\"")
+                        Text("IL PULSANTE È AGGANCIO PER I PROGETTI DELL'ETICHETTA \(label.title)")
+                            .font(.title)
+                            .bold()
                             .multilineTextAlignment(.center)
                             .padding()
                         Button(action: { showLockInfo = false }) {
@@ -597,6 +601,13 @@ struct LabelHeaderView: View {
                     }
                     .padding()
                     .frame(width: 300)
+                }
+            } else {
+                // If label is empty and locked, ensure the lock is released.
+                if projectManager.projects.filter({ $0.labelID == label.id }).isEmpty {
+                    if projectManager.lockedLabelID == label.id {
+                        projectManager.lockedLabelID = nil
+                    }
                 }
             }
         }
@@ -776,8 +787,9 @@ struct DeleteLabelSheetWrapper: View {
     var body: some View {
         VStack(spacing: 20) {
             Text("Elimina Etichetta")
-                .font(.title).bold()
-            Text("Sei sicuro di voler eliminare l'etichetta \"\(label.title)\"?")
+                .font(.title)
+                .bold()
+            Text("Sei sicuro di voler eliminare l'etichetta \(label.title) ?")
                 .multilineTextAlignment(.center)
                 .padding()
             Button(action: {
@@ -819,10 +831,11 @@ struct ChangeLabelColorDirectSheet: View {
     }
     var body: some View {
         VStack(spacing: 20) {
-            // Big circle showing the selected color
+            // Big circle moved a bit higher by adding extra top padding.
             Circle()
                 .fill(selectedColor)
                 .frame(width: 150, height: 150)
+                .padding(.top, 40)
             Text("Scegli un Colore")
                 .font(.title)
             ColorPicker("", selection: $selectedColor, supportsOpacity: false)
@@ -833,6 +846,7 @@ struct ChangeLabelColorDirectSheet: View {
                     projectManager.labels[idx].color = UIColor(selectedColor).toHex
                     projectManager.saveLabels()
                 }
+                onDismiss()
             }) {
                 Text("Conferma")
                     .font(.title2)
@@ -866,9 +880,18 @@ struct NoteView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading) {
-                    Text(project.name).font(.title3).bold()
+                    Text(project.name)
+                        .underline()
+                        .font(.title3)
+                        .foregroundColor({
+                            if let lbl = projectManager.labels.first(where: { $0.id == project.labelID }) {
+                                return Color(hex: lbl.color)
+                            }
+                            return .black
+                        }())
                     Text("Tot Monte Ore: \(project.totalProjectTimeString)")
-                        .font(.title3).bold()
+                        .font(.title3)
+                        .bold()
                 }
                 Spacer()
                 if editMode {
@@ -960,9 +983,7 @@ struct ComeFunzionaSheetView: View {
             Text("""
 Se un'attività supera la mezzanotte, al momento di pigiarne il termine l'app creerà un nuovo giorno. Basterà modificare la nota col pulsante in alto a destra e inserire un termine di fine orario che fuoriesca le 24. Ad esempio, se l'attività si è conclusa all'1:29, si inserisca 25:29.
 
-Ogni attività o task può avere una nota per differenziare tipologie di lavoro. Si consiglia di denominare le note "NomeProgetto NomeAttività".
-
-L'uso dell'app è flessibile e adattabile alle proprie esigenze.
+Ogni attività o task può avere una nota per differenziare tipologie di lavoro. Si consiglia di denominare le note NomeProgetto NomeAttività.
 """)
                 .multilineTextAlignment(.center)
                 .padding()
@@ -1072,7 +1093,7 @@ struct ProjectManagerView: View {
                         let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
                         if !unlabeled.isEmpty {
                             ForEach(unlabeled) { project in
-                                ProjectRowView(project: project, projectManager: projectManager, editingProjects: false)
+                                ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
                             }
                         }
                         ForEach(projectManager.labels) { label in
@@ -1080,7 +1101,7 @@ struct ProjectManagerView: View {
                             if !backupForLabel.isEmpty {
                                 LabelHeaderView(label: label, projectManager: projectManager, isBackup: true)
                                 ForEach(backupForLabel) { project in
-                                    ProjectRowView(project: project, projectManager: projectManager, editingProjects: false)
+                                    ProjectRowView(project: project, projectManager: projectManager, editingProjects: editingProjects)
                                 }
                             }
                         }
@@ -1415,7 +1436,7 @@ struct ContentView: View {
                     .padding(.bottom, isLandscape ? 0 : 30)
                 }
                 if showPopup {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia Sbattimenti zero eh")
                         .transition(.scale)
                 }
             }
