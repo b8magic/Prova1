@@ -1281,17 +1281,6 @@ struct ProjectManagerView: View {
     }
 }
 
-// MARK: - ActivityView Wrapper
-
-struct ActivityView: UIViewControllerRepresentable {
-    var activityItems: [Any]
-    var applicationActivities: [UIActivity]? = nil
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
-    }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
 // MARK: - NoNotesPromptView, PopupView, NonCHoSbattiSheetView
 
 struct NoNotesPromptView: View {
@@ -1498,8 +1487,6 @@ struct BottomButtonsView: View {
         projectManager.currentProject = next
     }
 }
-
-// MARK: ActivityView Wrapper (already defined above)
 
 // MARK: - App Main
 
