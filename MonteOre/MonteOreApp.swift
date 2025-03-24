@@ -1,5 +1,4 @@
 import SwiftUI
-import AVFoundation
 import UniformTypeIdentifiers
 
 // MARK: - Color Extensions
@@ -29,13 +28,13 @@ extension Color {
 
 extension UIColor {
     var toHex: String {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        var r: CGFloat=0, g: CGFloat=0, b: CGFloat=0, a: CGFloat=0
         self.getRed(&r, green: &g, blue: &b, alpha: &a)
         return String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
     }
 }
 
-// MARK: - Alert Structures
+// MARK: - Alerts
 struct AlertError: Identifiable {
     var id: String { message }
     let message: String
@@ -88,7 +87,7 @@ struct NoteRow: Identifiable, Codable {
     }
     func minutesFromString(_ timeStr: String) -> Int? {
         let parts = timeStr.split(separator: ":")
-        if parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) { return h*60 + m }
+        if parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) { return h * 60 + m }
         return nil
     }
 }
@@ -317,7 +316,7 @@ class ProjectManager: ObservableObject {
         }
     }
     
-    // MARK: - Reordering Projects (per group)
+    // MARK: - Reordering Projects per Group
     func moveProjects(forLabel labelID: UUID?, indices: IndexSet, newOffset: Int) {
         var group = projects.filter { $0.labelID == labelID }
         group.move(fromOffsets: indices, toOffset: newOffset)
@@ -505,6 +504,7 @@ struct ProjectRowView: View {
     @State private var showSecondarySheet = false
     var body: some View {
         HStack(spacing: 0) {
+            // Left area opens the project.
             Button(action: {
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -523,6 +523,7 @@ struct ProjectRowView: View {
             }
             .buttonStyle(PlainButtonStyle())
             Divider().frame(width: 1).background(Color.gray)
+            // Right area shows text that triggers label assignment or editing.
             Button(action: { showSecondarySheet = true }) {
                 Text(editingProjects ? "Rinomina o Elimina" : "Etichetta")
                     .font(.system(size: 16))
@@ -543,28 +544,27 @@ struct ProjectRowView: View {
     }
 }
 
-// MARK: - NoteView (Main Project Note View)
+// MARK: - NoteView (Main Note Content)
 struct NoteView: View {
     @ObservedObject var project: Project
     var projectManager: ProjectManager
     var body: some View {
+        // Wrap the entire note content in a container that gets a yellow background if the project is running.
         VStack {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading) {
-                        Text(project.name)
-                            .font(.title3)
-                        Text("Tot Monte Ore: \(project.totalProjectTimeString)")
-                            .font(.title3)
-                            .bold()
-                    }
+                HStack {
+                    Text(project.name)
+                        .font(.title3)
                     Spacer()
+                    Text("Tot Monte Ore: \(project.totalProjectTimeString)")
+                        .font(.title3)
+                        .bold()
                 }
                 .padding(.bottom, 5)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(project.noteRows) { row in
-                            HStack(spacing: 8) {
+                            HStack {
                                 Text(row.giorno)
                                     .font(.system(size: 17))
                                     .frame(minHeight: 60)
@@ -689,6 +689,871 @@ struct LabelHeaderView: View {
     }
 }
 
+// MARK: - LabelsManagerView
+enum LabelActionType: Identifiable {
+    case rename(label: ProjectLabel, initialText: String)
+    case delete(label: ProjectLabel)
+    case changeColor(label: ProjectLabel)
+    var id: UUID {
+        switch self {
+        case .rename(let label, _): return label.id
+        case .delete(let label): return label.id
+        case .changeColor(let label): return label.id
+        }
+    }
+}
+
+struct LabelsManagerView: View {
+    @ObservedObject var projectManager: ProjectManager
+    @Environment(\.presentationMode) var presentationMode
+    @State private var newLabelTitle: String = ""
+    @State private var newLabelColor: Color = .black
+    @State private var activeLabelAction: LabelActionType? = nil
+    @State private var isEditingLabels: Bool = false
+    var body: some View {
+        NavigationView {
+            VStack {
+                List {
+                    ForEach(projectManager.labels) { label in
+                        HStack(spacing: 12) {
+                            Button(action: { activeLabelAction = .changeColor(label: label) }) {
+                                Circle()
+                                    .fill(Color(hex: label.color))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            Text(label.title)
+                            Spacer()
+                            Button("Rinomina") {
+                                activeLabelAction = .rename(label: label, initialText: label.title)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.blue)
+                            Button("Elimina") {
+                                activeLabelAction = .delete(label: label)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.red)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .onMove { indices, newOffset in
+                        projectManager.labels.move(fromOffsets: indices, toOffset: newOffset)
+                        projectManager.saveLabels()
+                    }
+                }
+                .listStyle(PlainListStyle())
+                HStack {
+                    TextField("Nuova etichetta", text: $newLabelTitle)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    ColorPicker("", selection: $newLabelColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .frame(width: 50)
+                    Button(action: {
+                        if !newLabelTitle.isEmpty {
+                            projectManager.addLabel(title: newLabelTitle, color: UIColor(newLabelColor).toHex)
+                            newLabelTitle = ""
+                            newLabelColor = .black
+                        }
+                    }) {
+                        Text("Crea")
+                            .foregroundColor(.green)
+                            .padding(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Etichette")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") { presentationMode.wrappedValue.dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { isEditingLabels.toggle() }) {
+                        Text(isEditingLabels ? "Fatto" : "Ordina")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .environment(\.editMode, .constant(isEditingLabels ? EditMode.active : EditMode.inactive))
+            .sheet(item: $activeLabelAction) { action in
+                switch action {
+                case .rename(let label, let initialText):
+                    RenameLabelSheetWrapper(projectManager: projectManager, label: label, initialText: initialText) {
+                        activeLabelAction = nil
+                    }
+                case .delete(let label):
+                    DeleteLabelSheetWrapper(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                case .changeColor(let label):
+                    ChangeLabelColorDirectSheet(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Label Action Sheet Wrappers
+struct RenameLabelSheetWrapper: View {
+    @ObservedObject var projectManager: ProjectManager
+    @State var label: ProjectLabel
+    @State var newName: String
+    var onDismiss: () -> Void
+    init(projectManager: ProjectManager, label: ProjectLabel, initialText: String, onDismiss: @escaping () -> Void) {
+        self.projectManager = projectManager
+        _label = State(initialValue: label)
+        _newName = State(initialValue: initialText)
+        self.onDismiss = onDismiss
+    }
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Rinomina Etichetta")
+                .font(.title)
+            TextField("Nuovo nome", text: $newName)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding()
+            Button(action: {
+                projectManager.renameLabel(label: label, newTitle: newName)
+                onDismiss()
+            }) {
+                Text("Conferma")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+struct DeleteLabelSheetWrapper: View {
+    @ObservedObject var projectManager: ProjectManager
+    var label: ProjectLabel
+    var onDismiss: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Elimina Etichetta")
+                .font(.title)
+                .bold()
+            Text("Sei sicuro di voler eliminare l'etichetta \(label.title) ?")
+                .multilineTextAlignment(.center)
+                .padding()
+            Button(action: {
+                projectManager.deleteLabel(label: label)
+                onDismiss()
+            }) {
+                Text("Elimina")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+                    .cornerRadius(8)
+            }
+            Button(action: { onDismiss() }) {
+                Text("Annulla")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.gray)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+struct ChangeLabelColorDirectSheet: View {
+    @ObservedObject var projectManager: ProjectManager
+    @State var label: ProjectLabel
+    @State var selectedColor: Color
+    var onDismiss: () -> Void
+    init(projectManager: ProjectManager, label: ProjectLabel, onDismiss: @escaping () -> Void) {
+        self.projectManager = projectManager
+        _label = State(initialValue: label)
+        _selectedColor = State(initialValue: Color(hex: label.color))
+        self.onDismiss = onDismiss
+    }
+    var body: some View {
+        VStack(spacing: 20) {
+            Circle()
+                .fill(selectedColor)
+                .frame(width: 150, height: 150)
+                .padding(.top, 40)
+            Text("Scegli un Colore")
+                .font(.title)
+            ColorPicker("", selection: $selectedColor, supportsOpacity: false)
+                .labelsHidden()
+                .padding()
+            Button(action: {
+                if let idx = projectManager.labels.firstIndex(where: { $0.id == label.id }) {
+                    projectManager.labels[idx].color = UIColor(selectedColor).toHex
+                    projectManager.saveLabels()
+                }
+                onDismiss()
+            }) {
+                Text("Conferma")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+            Button(action: { onDismiss() }) {
+                Text("Annulla")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - NoteView (Main Content)
+struct NoteView: View {
+    @ObservedObject var project: Project
+    var projectManager: ProjectManager
+    var body: some View {
+        VStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(project.name)
+                        .font(.title3)
+                    Spacer()
+                    Text("Tot Monte Ore: \(project.totalProjectTimeString)")
+                        .font(.title3)
+                        .bold()
+                }
+                .padding(.bottom, 5)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(project.noteRows) { row in
+                            HStack {
+                                Text(row.giorno)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.orari)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.totalTimeString)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.note)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+            }
+            .padding(20)
+        }
+        .background(projectManager.isProjectRunning(project) ? Color.yellow : Color.clear)
+        .cornerRadius(25)
+        .padding()
+    }
+}
+
+// MARK: - LabelHeaderView
+struct LabelHeaderView: View {
+    let label: ProjectLabel
+    @ObservedObject var projectManager: ProjectManager
+    var isBackup: Bool = false
+    @State private var showLockInfo: Bool = false
+    @State private var isTargeted: Bool = false
+    var body: some View {
+        HStack {
+            Circle()
+                .fill(Color(hex: label.color))
+                .frame(width: 16, height: 16)
+            Text(label.title)
+                .font(.headline)
+                .underline()
+                .foregroundColor(Color(hex: label.color))
+            Spacer()
+            if !isBackup, projectManager.projects.contains(where: { $0.labelID == label.id }) {
+                Button(action: {
+                    if projectManager.lockedLabelID != label.id {
+                        projectManager.lockedLabelID = label.id
+                        if let first = projectManager.projects.first(where: { $0.labelID == label.id }) {
+                            projectManager.currentProject = first
+                        }
+                        showLockInfo = true
+                    } else {
+                        projectManager.lockedLabelID = nil
+                    }
+                }) {
+                    Image(systemName: projectManager.lockedLabelID == label.id ? "lock.fill" : "lock.open")
+                        .foregroundColor(.black)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .popover(isPresented: $showLockInfo, arrowEdge: .bottom) {
+                    VStack(spacing: 20) {
+                        Text("IL PULSANTE È AGGANCIO PER I PROGETTI DELL'ETICHETTA \(label.title)")
+                            .font(.title)
+                            .bold()
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        ForEach(projectManager.projects.filter { $0.labelID == label.id }) { proj in
+                            Text(proj.name)
+                                .underline()
+                                .foregroundColor({
+                                    if let lbl = projectManager.labels.first(where: { $0.id == proj.labelID }) {
+                                        return Color(hex: lbl.color)
+                                    }
+                                    return .black
+                                }())
+                                .font(.headline)
+                        }
+                        Button(action: { showLockInfo = false }) {
+                            Text("Chiudi")
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                    .frame(width: 300)
+                }
+            } else {
+                if projectManager.projects.filter({ $0.labelID == label.id }).isEmpty {
+                    if projectManager.lockedLabelID == label.id {
+                        projectManager.lockedLabelID = nil
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(minHeight: 50)
+        .background(isTargeted ? Color.blue.opacity(0.2) : Color.clear)
+        .onDrop(of: [UTType.text.identifier], isTargeted: $isTargeted) { providers in
+            providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { (data, error) in
+                if let data = data as? Data,
+                   let idString = String(data: data, encoding: .utf8),
+                   let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
+                            projectManager.projects[index].labelID = label.id
+                            projectManager.saveProjects()
+                            projectManager.objectWillChange.send()
+                            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+                        }
+                    }
+                }
+            }
+            return true
+        }
+    }
+}
+
+// MARK: - LabelsManagerView
+enum LabelActionType: Identifiable {
+    case rename(label: ProjectLabel, initialText: String)
+    case delete(label: ProjectLabel)
+    case changeColor(label: ProjectLabel)
+    var id: UUID {
+        switch self {
+        case .rename(let label, _): return label.id
+        case .delete(let label): return label.id
+        case .changeColor(let label): return label.id
+        }
+    }
+}
+
+struct LabelsManagerView: View {
+    @ObservedObject var projectManager: ProjectManager
+    @Environment(\.presentationMode) var presentationMode
+    @State private var newLabelTitle: String = ""
+    @State private var newLabelColor: Color = .black
+    @State private var activeLabelAction: LabelActionType? = nil
+    @State private var isEditingLabels: Bool = false
+    var body: some View {
+        NavigationView {
+            VStack {
+                List {
+                    ForEach(projectManager.labels) { label in
+                        HStack(spacing: 12) {
+                            Button(action: { activeLabelAction = .changeColor(label: label) }) {
+                                Circle()
+                                    .fill(Color(hex: label.color))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            Text(label.title)
+                            Spacer()
+                            Button("Rinomina") {
+                                activeLabelAction = .rename(label: label, initialText: label.title)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.blue)
+                            Button("Elimina") {
+                                activeLabelAction = .delete(label: label)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.red)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .onMove { indices, newOffset in
+                        projectManager.labels.move(fromOffsets: indices, toOffset: newOffset)
+                        projectManager.saveLabels()
+                    }
+                }
+                .listStyle(PlainListStyle())
+                HStack {
+                    TextField("Nuova etichetta", text: $newLabelTitle)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    ColorPicker("", selection: $newLabelColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .frame(width: 50)
+                    Button(action: {
+                        if !newLabelTitle.isEmpty {
+                            projectManager.addLabel(title: newLabelTitle, color: UIColor(newLabelColor).toHex)
+                            newLabelTitle = ""
+                            newLabelColor = .black
+                        }
+                    }) {
+                        Text("Crea")
+                            .foregroundColor(.green)
+                            .padding(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Etichette")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") { presentationMode.wrappedValue.dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { isEditingLabels.toggle() }) {
+                        Text(isEditingLabels ? "Fatto" : "Ordina")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .environment(\.editMode, .constant(isEditingLabels ? EditMode.active : EditMode.inactive))
+            .sheet(item: $activeLabelAction) { action in
+                switch action {
+                case .rename(let label, let initialText):
+                    RenameLabelSheetWrapper(projectManager: projectManager, label: label, initialText: initialText) {
+                        activeLabelAction = nil
+                    }
+                case .delete(let label):
+                    DeleteLabelSheetWrapper(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                case .changeColor(let label):
+                    ChangeLabelColorDirectSheet(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Label Action Sheet Wrappers
+struct RenameLabelSheetWrapper: View {
+    @ObservedObject var projectManager: ProjectManager
+    @State var label: ProjectLabel
+    @State var newName: String
+    var onDismiss: () -> Void
+    init(projectManager: ProjectManager, label: ProjectLabel, initialText: String, onDismiss: @escaping () -> Void) {
+        self.projectManager = projectManager
+        _label = State(initialValue: label)
+        _newName = State(initialValue: initialText)
+        self.onDismiss = onDismiss
+    }
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Rinomina Etichetta")
+                .font(.title)
+            TextField("Nuovo nome", text: $newName)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding()
+            Button(action: {
+                projectManager.renameLabel(label: label, newTitle: newName)
+                onDismiss()
+            }) {
+                Text("Conferma")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+struct DeleteLabelSheetWrapper: View {
+    @ObservedObject var projectManager: ProjectManager
+    var label: ProjectLabel
+    var onDismiss: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Elimina Etichetta")
+                .font(.title)
+                .bold()
+            Text("Sei sicuro di voler eliminare l'etichetta \(label.title) ?")
+                .multilineTextAlignment(.center)
+                .padding()
+            Button(action: {
+                projectManager.deleteLabel(label: label)
+                onDismiss()
+            }) {
+                Text("Elimina")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+                    .cornerRadius(8)
+            }
+            Button(action: { onDismiss() }) {
+                Text("Annulla")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.gray)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+struct ChangeLabelColorDirectSheet: View {
+    @ObservedObject var projectManager: ProjectManager
+    @State var label: ProjectLabel
+    @State var selectedColor: Color
+    var onDismiss: () -> Void
+    init(projectManager: ProjectManager, label: ProjectLabel, onDismiss: @escaping () -> Void) {
+        self.projectManager = projectManager
+        _label = State(initialValue: label)
+        _selectedColor = State(initialValue: Color(hex: label.color))
+        self.onDismiss = onDismiss
+    }
+    var body: some View {
+        VStack(spacing: 20) {
+            Circle()
+                .fill(selectedColor)
+                .frame(width: 150, height: 150)
+                .padding(.top, 40)
+            Text("Scegli un Colore")
+                .font(.title)
+            ColorPicker("", selection: $selectedColor, supportsOpacity: false)
+                .labelsHidden()
+                .padding()
+            Button(action: {
+                if let idx = projectManager.labels.firstIndex(where: { $0.id == label.id }) {
+                    projectManager.labels[idx].color = UIColor(selectedColor).toHex
+                    projectManager.saveLabels()
+                }
+                onDismiss()
+            }) {
+                Text("Conferma")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+            Button(action: { onDismiss() }) {
+                Text("Annulla")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - NoteView (Main Note Content)
+struct NoteView: View {
+    @ObservedObject var project: Project
+    var projectManager: ProjectManager
+    var body: some View {
+        VStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(project.name)
+                        .font(.title3)
+                    Spacer()
+                    Text("Tot Monte Ore: \(project.totalProjectTimeString)")
+                        .font(.title3)
+                        .bold()
+                }
+                .padding(.bottom, 5)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(project.noteRows) { row in
+                            HStack {
+                                Text(row.giorno)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.orari)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.totalTimeString)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                                Divider().frame(height: 60).background(Color.black)
+                                Text(row.note)
+                                    .font(.system(size: 17))
+                                    .frame(minHeight: 60)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+            }
+            .padding(20)
+        }
+        .background(projectManager.isProjectRunning(project) ? Color.yellow : Color.clear)
+        .cornerRadius(25)
+        .padding()
+    }
+}
+
+// MARK: - LabelHeaderView
+struct LabelHeaderView: View {
+    let label: ProjectLabel
+    @ObservedObject var projectManager: ProjectManager
+    var isBackup: Bool = false
+    @State private var showLockInfo: Bool = false
+    @State private var isTargeted: Bool = false
+    var body: some View {
+        HStack {
+            Circle()
+                .fill(Color(hex: label.color))
+                .frame(width: 16, height: 16)
+            Text(label.title)
+                .font(.headline)
+                .underline()
+                .foregroundColor(Color(hex: label.color))
+            Spacer()
+            if !isBackup, projectManager.projects.contains(where: { $0.labelID == label.id }) {
+                Button(action: {
+                    if projectManager.lockedLabelID != label.id {
+                        projectManager.lockedLabelID = label.id
+                        if let first = projectManager.projects.first(where: { $0.labelID == label.id }) {
+                            projectManager.currentProject = first
+                        }
+                        showLockInfo = true
+                    } else {
+                        projectManager.lockedLabelID = nil
+                    }
+                }) {
+                    Image(systemName: projectManager.lockedLabelID == label.id ? "lock.fill" : "lock.open")
+                        .foregroundColor(.black)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .popover(isPresented: $showLockInfo, arrowEdge: .bottom) {
+                    VStack(spacing: 20) {
+                        Text("IL PULSANTE È AGGANCIO PER I PROGETTI DELL'ETICHETTA \(label.title)")
+                            .font(.title)
+                            .bold()
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        ForEach(projectManager.projects.filter { $0.labelID == label.id }) { proj in
+                            Text(proj.name)
+                                .underline()
+                                .foregroundColor({
+                                    if let lbl = projectManager.labels.first(where: { $0.id == proj.labelID }) {
+                                        return Color(hex: lbl.color)
+                                    }
+                                    return .black
+                                }())
+                                .font(.headline)
+                        }
+                        Button(action: { showLockInfo = false }) {
+                            Text("Chiudi")
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                    .frame(width: 300)
+                }
+            } else {
+                if projectManager.projects.filter({ $0.labelID == label.id }).isEmpty {
+                    if projectManager.lockedLabelID == label.id {
+                        projectManager.lockedLabelID = nil
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(minHeight: 50)
+        .background(isTargeted ? Color.blue.opacity(0.2) : Color.clear)
+        .onDrop(of: [UTType.text.identifier], isTargeted: $isTargeted) { providers in
+            providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { (data, error) in
+                if let data = data as? Data,
+                   let idString = String(data: data, encoding: .utf8),
+                   let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
+                            projectManager.projects[index].labelID = label.id
+                            projectManager.saveProjects()
+                            projectManager.objectWillChange.send()
+                            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+                        }
+                    }
+                }
+            }
+            return true
+        }
+    }
+}
+
+// MARK: - LabelsManagerView
+enum LabelActionType: Identifiable {
+    case rename(label: ProjectLabel, initialText: String)
+    case delete(label: ProjectLabel)
+    case changeColor(label: ProjectLabel)
+    var id: UUID {
+        switch self {
+        case .rename(let label, _): return label.id
+        case .delete(let label): return label.id
+        case .changeColor(let label): return label.id
+        }
+    }
+}
+
+struct LabelsManagerView: View {
+    @ObservedObject var projectManager: ProjectManager
+    @Environment(\.presentationMode) var presentationMode
+    @State private var newLabelTitle: String = ""
+    @State private var newLabelColor: Color = .black
+    @State private var activeLabelAction: LabelActionType? = nil
+    @State private var isEditingLabels: Bool = false
+    var body: some View {
+        NavigationView {
+            VStack {
+                List {
+                    ForEach(projectManager.labels) { label in
+                        HStack(spacing: 12) {
+                            Button(action: { activeLabelAction = .changeColor(label: label) }) {
+                                Circle()
+                                    .fill(Color(hex: label.color))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            Text(label.title)
+                            Spacer()
+                            Button("Rinomina") {
+                                activeLabelAction = .rename(label: label, initialText: label.title)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.blue)
+                            Button("Elimina") {
+                                activeLabelAction = .delete(label: label)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.red)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .onMove { indices, newOffset in
+                        projectManager.labels.move(fromOffsets: indices, toOffset: newOffset)
+                        projectManager.saveLabels()
+                    }
+                }
+                .listStyle(PlainListStyle())
+                HStack {
+                    TextField("Nuova etichetta", text: $newLabelTitle)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    ColorPicker("", selection: $newLabelColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .frame(width: 50)
+                    Button(action: {
+                        if !newLabelTitle.isEmpty {
+                            projectManager.addLabel(title: newLabelTitle, color: UIColor(newLabelColor).toHex)
+                            newLabelTitle = ""
+                            newLabelColor = .black
+                        }
+                    }) {
+                        Text("Crea")
+                            .foregroundColor(.green)
+                            .padding(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Etichette")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") { presentationMode.wrappedValue.dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { isEditingLabels.toggle() }) {
+                        Text(isEditingLabels ? "Fatto" : "Ordina")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .environment(\.editMode, .constant(isEditingLabels ? EditMode.active : EditMode.inactive))
+            .sheet(item: $activeLabelAction) { action in
+                switch action {
+                case .rename(let label, let initialText):
+                    RenameLabelSheetWrapper(projectManager: projectManager, label: label, initialText: initialText) {
+                        activeLabelAction = nil
+                    }
+                case .delete(let label):
+                    DeleteLabelSheetWrapper(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                case .changeColor(let label):
+                    ChangeLabelColorDirectSheet(projectManager: projectManager, label: label) {
+                        activeLabelAction = nil
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - ContentView (Main)
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
@@ -711,10 +1576,7 @@ struct ContentView: View {
                                           onNonCHoSbatti: { showNonCHoSbattiSheet = true })
                     } else {
                         if let project = projectManager.currentProject {
-                            // The NoteView now handles its own yellow background if the project is running.
                             NoteView(project: project, projectManager: projectManager)
-                                .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
-                                       height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
                         }
                     }
                     Button(action: { mainButtonTapped() }) {
@@ -795,12 +1657,10 @@ struct ContentView: View {
         }
         if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
         let now = Date()
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "it_IT")
+        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
         df.dateFormat = "EEEE dd/MM/yy"
         let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter()
-        tf.locale = Locale(identifier: "it_IT")
+        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
         tf.dateFormat = "HH:mm"
         let timeStr = tf.string(from: now)
         projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
@@ -916,8 +1776,6 @@ struct ContentView: View {
                     } else {
                         if let project = projectManager.currentProject {
                             NoteView(project: project, projectManager: projectManager)
-                                .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
-                                       height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
                         }
                     }
                     Button(action: { mainButtonTapped() }) {
@@ -998,12 +1856,10 @@ struct ContentView: View {
         }
         if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
         let now = Date()
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "it_IT")
+        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
         df.dateFormat = "EEEE dd/MM/yy"
         let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter()
-        tf.locale = Locale(identifier: "it_IT")
+        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
         tf.dateFormat = "HH:mm"
         let timeStr = tf.string(from: now)
         projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
