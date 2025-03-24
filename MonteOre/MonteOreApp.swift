@@ -27,7 +27,7 @@ extension Color {
     }
 }
 
-// Estensione per convertire UIColor in Hex String (usata per il ColorPicker)
+// Estensione per convertire UIColor in Hex (usata per il ColorPicker)
 extension UIColor {
     var toHex: String {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -57,13 +57,12 @@ enum ActiveAlert: Identifiable {
 
 struct NoteRow: Identifiable, Codable {
     var id = UUID()
-    var giorno: String // e.g. "Giovedì 18/03/25"
-    var orari: String // e.g. "14:32-17:12 17:18-"
+    var giorno: String
+    var orari: String
     var note: String = ""
     
-    enum CodingKeys: String, CodingKey {
-        case id, giorno, orari, note
-    }
+    enum CodingKeys: String, CodingKey { case id, giorno, orari, note }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -117,11 +116,10 @@ class Project: Identifiable, ObservableObject, Codable {
     var id = UUID()
     @Published var name: String
     @Published var noteRows: [NoteRow]
-    var labelID: UUID? = nil  // Assegnazione dell'etichetta
+    var labelID: UUID? = nil
     
-    enum CodingKeys: CodingKey {
-        case id, name, noteRows, labelID
-    }
+    enum CodingKeys: CodingKey { case id, name, noteRows, labelID }
+    
     init(name: String) {
         self.name = name
         self.noteRows = []
@@ -162,14 +160,10 @@ class ProjectManager: ObservableObject {
     @Published var labels: [ProjectLabel] = []
     
     @Published var currentProject: Project? {
-        didSet {
-            if let cp = currentProject {
-                UserDefaults.standard.set(cp.id.uuidString, forKey: "lastProjectId")
-            }
-        }
+        didSet { if let cp = currentProject { UserDefaults.standard.set(cp.id.uuidString, forKey: "lastProjectId") } }
     }
     
-    // Stato del lucchetto – solo una etichetta può essere bloccata
+    // Stato del lucchetto: solo una etichetta può essere bloccata
     @Published var lockedLabelID: UUID? = nil {
         didSet {
             if let locked = lockedLabelID {
@@ -329,15 +323,11 @@ class ProjectManager: ObservableObject {
     func deleteLabel(label: ProjectLabel) {
         labels.removeAll(where: { $0.id == label.id })
         for proj in projects {
-            if proj.labelID == label.id {
-                proj.labelID = nil
-            }
+            if proj.labelID == label.id { proj.labelID = nil }
         }
         saveLabels()
         saveProjects()
-        if lockedLabelID == label.id {
-            lockedLabelID = nil
-        }
+        if lockedLabelID == label.id { lockedLabelID = nil }
     }
     func saveLabels() {
         let fm = FileManager.default
@@ -501,13 +491,15 @@ struct ComeFunzionaSheetView: View {
     var body: some View {
         VStack {
             Text("""
-            Se un'attività supera la mezzanotte, al momento di pigiarne il termine l'app creerà un nuovo giorno. Basterá modificare la nota col pulsante in alto a destra, e inserire un termine di fine orario che fuoriesca le 24. Ad esempio, se l'attività si è conclusa all'1:29, si inserisca 25:29.
-            Ogni singola attività o task puó avere una sua nota, per differenziare tipologie di lavori o attività differenti all'interno di uno stesso progetto. In tal caso si consiglia di denominare le note "NomeProgetto NomeAttività".
-            L'uso dell'app è flessibile e adattabile alle proprie esigenze.
-            """)
-            .multilineTextAlignment(.center)
-            .padding()
-            .font(.custom("Permanent Marker", size: 20))
+Se un'attività supera la mezzanotte, al momento di pigiarne il termine l'app creerà un nuovo giorno. Basterà modificare la nota col pulsante in alto a destra, e inserire un termine di fine orario che fuoriesca le 24. Ad esempio, se l'attività si è conclusa all'1:29, si inserisca 25:29.
+
+Ogni singola attività o task può avere una sua nota, per differenziare tipologie di lavori o attività differenti all'interno di uno stesso progetto. In tal caso si consiglia di denominare le note "NomeProgetto NomeAttività".
+
+L'uso dell'app è flessibile e adattabile alle proprie esigenze.
+""")
+                .multilineTextAlignment(.center)
+                .padding()
+                .font(.custom("Permanent Marker", size: 20))
             Button(action: { onDismiss() }) {
                 Text("Chiudi")
                     .font(.title2)
@@ -574,9 +566,7 @@ struct LabelAssignmentView: View {
                     HStack {
                         Text("Nessuna etichetta")
                         Spacer()
-                        if project.labelID == nil {
-                            Image(systemName: "checkmark")
-                        }
+                        if project.labelID == nil { Image(systemName: "checkmark") }
                     }
                 }
                 ForEach(projectManager.labels) { label in
@@ -595,9 +585,7 @@ struct LabelAssignmentView: View {
                                 .frame(width: 20, height: 20)
                             Text(label.title)
                             Spacer()
-                            if project.labelID == label.id {
-                                Image(systemName: "checkmark")
-                            }
+                            if project.labelID == label.id { Image(systemName: "checkmark") }
                         }
                     }
                 }
@@ -621,6 +609,8 @@ struct LabelsManagerView: View {
     @State private var labelToRename: ProjectLabel? = nil
     @State private var renameText: String = ""
     @State private var showRenameAlert: Bool = false
+    @State private var showDeleteAlert: Bool = false
+    @State private var labelToDelete: ProjectLabel? = nil
     
     var body: some View {
         NavigationView {
@@ -628,8 +618,10 @@ struct LabelsManagerView: View {
                 List {
                     ForEach(projectManager.labels) { label in
                         HStack {
-                            // Il cerchio: toccandolo si apre un ColorPicker
-                            Button(action: {}) {
+                            Button(action: {
+                                // Apre il ColorPicker in una sheet per cambiare il colore
+                                labelToRename = label // usiamo la stessa variabile per il cambio colore
+                            }) {
                                 Circle()
                                     .fill(Color(hex: label.color))
                                     .frame(width: 20, height: 20)
@@ -643,13 +635,11 @@ struct LabelsManagerView: View {
                                 showRenameAlert = true
                             }
                             .foregroundColor(.blue)
-                            .buttonStyle(BorderlessButtonStyle())
                             Button("Elimina") {
-                                // Mostra un alert di conferma per eliminare
-                                showDeleteConfirmation(for: label)
+                                labelToDelete = label
+                                showDeleteAlert = true
                             }
                             .foregroundColor(.red)
-                            .buttonStyle(BorderlessButtonStyle())
                         }
                     }
                 }
@@ -657,13 +647,11 @@ struct LabelsManagerView: View {
                 HStack {
                     TextField("Nuova etichetta", text: $newLabelTitle)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                    // ColorPicker per selezionare il colore
                     ColorPicker("", selection: $newLabelColor, supportsOpacity: false)
                         .labelsHidden()
                         .frame(width: 50)
                     Button(action: {
                         if !newLabelTitle.isEmpty {
-                            // Converte il colore scelto in HEX
                             let hex = UIColor(newLabelColor).toHex
                             projectManager.addLabel(title: newLabelTitle, color: hex)
                             newLabelTitle = ""
@@ -696,17 +684,19 @@ struct LabelsManagerView: View {
                     secondaryButton: .cancel()
                 )
             }
+            .alert(isPresented: $showDeleteAlert) {
+                Alert(
+                    title: Text("Elimina Etichetta"),
+                    message: Text("Sei sicuro di voler eliminare l'etichetta \"\(labelToDelete?.title ?? "")\"?"),
+                    primaryButton: .destructive(Text("Elimina"), action: {
+                        if let label = labelToDelete {
+                            projectManager.deleteLabel(label: label)
+                        }
+                    }),
+                    secondaryButton: .cancel()
+                )
+            }
         }
-    }
-    
-    func showDeleteConfirmation(for label: ProjectLabel) {
-        guard let window = UIApplication.shared.windows.first else { return }
-        let alert = UIAlertController(title: "Elimina Etichetta", message: "Sei sicuro di voler eliminare l'etichetta \"\(label.title)\"?", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Annulla", style: .cancel, handler: nil))
-        alert.addAction(UIAlertAction(title: "Elimina", style: .destructive, handler: { _ in
-            projectManager.deleteLabel(label: label)
-        }))
-        window.rootViewController?.present(alert, animated: true, completion: nil)
     }
 }
 
@@ -724,9 +714,11 @@ struct ProjectRowView: View {
         HStack {
             Text(project.name)
             Spacer()
+            // Bottone "Modifica" semplice in blu
             Button("Modifica") {
                 showActionSheet = true
             }
+            .foregroundColor(.blue)
             .actionSheet(isPresented: $showActionSheet) {
                 ActionSheet(title: Text("Modifica Progetto"), buttons: [
                     .default(Text("Rinomina progetto"), action: {
@@ -772,8 +764,14 @@ struct ProjectRowView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            // Se si tocca la riga (fuori dal pulsante “Modifica”), apri il progetto principale
-            projectManager.currentProject = project
+            // Se è bloccata un'etichetta, solo i progetti appartenenti a quella vengono aperti
+            if let locked = projectManager.lockedLabelID {
+                if project.labelID == locked {
+                    projectManager.currentProject = project
+                }
+            } else {
+                projectManager.currentProject = project
+            }
         }
         .padding(.vertical, 4)
     }
@@ -783,9 +781,11 @@ struct ProjectRowView: View {
 struct LabelHeaderView: View {
     let label: ProjectLabel
     @ObservedObject var projectManager: ProjectManager
+    @State private var showLockInfo: Bool = false
+    
     var body: some View {
         HStack {
-            // Mostra il cerchietto con il colore dell'etichetta
+            // Cerchietto colore
             Circle()
                 .fill(Color(hex: label.color))
                 .frame(width: 16, height: 16)
@@ -794,20 +794,43 @@ struct LabelHeaderView: View {
                 .underline()
                 .foregroundColor(Color(hex: label.color))
             Spacer()
-            // Visualizza il lucchetto solo se nessun'altra etichetta è bloccata o se questo è quella bloccata
+            // Se non è bloccata nessuna o se questo è quella bloccata
             if projectManager.lockedLabelID == nil || projectManager.lockedLabelID == label.id {
                 Button(action: {
-                    // Tocco semplice: se è già bloccata, sblocca; altrimenti blocca
-                    if projectManager.lockedLabelID == label.id {
-                        projectManager.lockedLabelID = nil
-                    } else {
+                    // Se l'etichetta non è bloccata, blocca e mostra info
+                    if projectManager.lockedLabelID != label.id {
                         projectManager.lockedLabelID = label.id
+                        showLockInfo = true
+                    } else {
+                        // Sblocco senza tendina
+                        projectManager.lockedLabelID = nil
                     }
                 }) {
                     Image(systemName: projectManager.lockedLabelID == label.id ? "lock.fill" : "lock.open")
                         .foregroundColor(.black)
                 }
                 .buttonStyle(PlainButtonStyle())
+                // Mostra popover solo quando l'etichetta viene bloccata
+                .popover(isPresented: $showLockInfo, arrowEdge: .bottom) {
+                    VStack(spacing: 20) {
+                        Text("Il bottone Giallo è agganciato ai progetti dell'etichetta \"\(label.title)\"")
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        Button(action: {
+                            projectManager.lockedLabelID = nil
+                            showLockInfo = false
+                        }) {
+                            Text("Chiudi")
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                    .frame(width: 300)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -825,7 +848,7 @@ struct ProjectManagerView: View {
     @State private var importError: AlertError? = nil
     @State private var pendingImportData: ExportData? = nil
     @State private var showImportConfirmationSheet: Bool = false
-    // Stato per il pulsante di aiuto
+    // Stato per il pulsante "Come funziona l'app"
     @State private var showHowItWorks: Bool = false
     
     var body: some View {
@@ -886,7 +909,6 @@ struct ProjectManagerView: View {
                             .padding(8)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green, lineWidth: 2))
                     }
-                    // Bottone Etichette
                     Button(action: {
                         showEtichetteSheet = true
                     }) {
@@ -899,9 +921,7 @@ struct ProjectManagerView: View {
                 }
                 .padding()
                 HStack {
-                    Button(action: {
-                        showShareSheet = true
-                    }) {
+                    Button(action: { showShareSheet = true }) {
                         Text("Condividi Monte Ore")
                             .font(.title3)
                             .foregroundColor(.purple)
@@ -909,9 +929,7 @@ struct ProjectManagerView: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple, lineWidth: 2))
                     }
                     Spacer()
-                    Button(action: {
-                        showImportSheet = true
-                    }) {
+                    Button(action: { showImportSheet = true }) {
                         Text("Importa File")
                             .font(.title3)
                             .foregroundColor(.orange)
@@ -921,19 +939,16 @@ struct ProjectManagerView: View {
                 }
                 .padding(.horizontal)
             }
-            // Rimuoviamo il titolo "Gestione Progetti"
+            // Rimuoviamo il titolo della NavigationView per dare più spazio
             .navigationBarTitle("", displayMode: .inline)
             .toolbar {
-                // Pulsante “?” giallo per il “Come funziona l'app”
+                // Pulsante "?" giallo
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showHowItWorks = true }) {
                         Text("?")
                             .font(.system(size: 40))
                             .bold()
-                            .foregroundColor(.black)
-                            .padding(8)
-                            .background(Color.yellow)
-                            .clipShape(Circle())
+                            .foregroundColor(.yellow)
                     }
                 }
             }
@@ -999,8 +1014,16 @@ struct ProjectManagerView: View {
                 }
             }
             .sheet(isPresented: $showHowItWorks) {
-                ComeFunzionaSheetView {
-                    showHowItWorks = false
+                // Mostra il bottone "Come funziona l'app" come da specifica
+                VStack {
+                    Button(action: { showHowItWorks = false }) {
+                        Text("Come funziona l'app")
+                            .font(.custom("Permanent Marker", size: 20))
+                            .foregroundColor(.black)
+                            .padding(8)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                    }
                 }
             }
         }
@@ -1012,8 +1035,7 @@ struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems,
-                                 applicationActivities: applicationActivities)
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
@@ -1052,9 +1074,7 @@ struct ContentView: View {
                         }
                     }
                     // Pulsante "Pigia il tempo" (sfondo nero)
-                    Button(action: {
-                        mainButtonTapped()
-                    }) {
+                    Button(action: { mainButtonTapped() }) {
                         Text("Pigia il tempo")
                             .font(.title2)
                             .foregroundColor(.white)
@@ -1063,9 +1083,7 @@ struct ContentView: View {
                     }
                     .disabled(projectManager.currentProject == nil)
                     HStack {
-                        Button(action: {
-                            showProjectManager = true
-                        }) {
+                        Button(action: { showProjectManager = true }) {
                             Text("Gestione\nProgetti")
                                 .font(.headline)
                                 .multilineTextAlignment(.center)
@@ -1076,9 +1094,7 @@ struct ContentView: View {
                         }
                         .background(Color(hex: "#54c0ff"))
                         Spacer()
-                        Button(action: {
-                            cycleProject()
-                        }) {
+                        Button(action: { cycleProject() }) {
                             Text("Cambia\nProgetto")
                                 .font(.headline)
                                 .multilineTextAlignment(.center)
@@ -1098,9 +1114,7 @@ struct ContentView: View {
                         .transition(.scale)
                 }
             }
-            .sheet(isPresented: $showProjectManager) {
-                ProjectManagerView(projectManager: projectManager)
-            }
+            .sheet(isPresented: $showProjectManager) { ProjectManagerView(projectManager: projectManager) }
             .sheet(isPresented: $showNonCHoSbattiSheet) {
                 NonCHoSbattiSheetView {
                     if !medalAwarded {
@@ -1182,7 +1196,7 @@ struct ContentView: View {
     }
     
     func playSound(success: Bool) {
-        // Implementa la riproduzione audio con AVFoundation se desiderato.
+        // Implementa la riproduzione audio se desiderato
     }
 }
 
