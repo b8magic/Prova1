@@ -547,13 +547,13 @@ struct ProjectRowView: View {
             
             Divider().frame(width: 1).background(Color.gray)
             
-            // Bottone "Modifica" con larghezza fissa
+            // Bottone "Modifica" con larghezza fissa e altezza fissa
             Button(action: {
                 showModificationSheet = true
             }) {
                 Text("Modifica")
                     .foregroundColor(.blue)
-                    .frame(width: 90, minHeight: 50)
+                    .frame(width: 90, height: 50)
                     .padding(.vertical, 8)
             }
         }
