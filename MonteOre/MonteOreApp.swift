@@ -558,10 +558,18 @@ struct ProjectRowView: View {
             }
         }
         .background(
-            isHighlighted ?
-                (project.labelID.flatMap { id in projectManager.labels.first(where: { $0.id == id }) }?.color ?? "#D3D3D3")
-                .flatMap { Color(hex: $0) } ?? Color.gray.opacity(0.3)
-            : Color.clear
+            Group {
+                if isHighlighted {
+                    if let labelId = project.labelID,
+                       let label = projectManager.labels.first(where: { $0.id == labelId }) {
+                        Color(hex: label.color)
+                    } else {
+                        Color(hex: "#D3D3D3")
+                    }
+                } else {
+                    Color.clear
+                }
+            }
         )
         .sheet(isPresented: $showModificationSheet) {
             ProjectModificationSheet(project: project, projectManager: projectManager, onDismiss: {
@@ -1308,14 +1316,42 @@ struct ProjectManagerView: View {
         if projectManager.isProjectRunning(current) {
             let running = available.filter { projectManager.isProjectRunning($0) }
             let names = running.map { $0.name }.joined(separator: ", ")
-            let msg = "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?"
-            // Mostra l'alert per avvertire
-            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
-            // Se si conferma, cambia progetto (la logica dell'alert può essere ulteriormente raffinata)
-            projectManager.currentProject = next
+            switchAlert = .running(newProject: next, message: "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?")
         } else {
             projectManager.currentProject = next
         }
+    }
+    
+    @State private var switchAlert: ActiveAlert? = nil
+    
+    func mainButtonTapped() {
+        guard let project = projectManager.currentProject else {
+            playSound(success: false); return
+        }
+        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
+        let now = Date()
+        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
+        df.dateFormat = "EEEE dd/MM/yy"
+        let giornoStr = df.string(from: now).capitalized
+        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
+        tf.dateFormat = "HH:mm"
+        let timeStr = tf.string(from: now)
+        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
+        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
+            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
+            project.noteRows.append(newRow)
+        } else {
+            guard var lastRow = project.noteRows.popLast() else { return }
+            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
+            else { lastRow.orari += " " + timeStr + "-" }
+            project.noteRows.append(lastRow)
+        }
+        projectManager.saveProjects()
+        playSound(success: true)
+    }
+    
+    func playSound(success: Bool) {
+        // Implementa AVFoundation se desiderato
     }
 }
 
@@ -1436,8 +1472,7 @@ struct ContentView: View {
         if projectManager.isProjectRunning(current) {
             let running = available.filter { projectManager.isProjectRunning($0) }
             let names = running.map { $0.name }.joined(separator: ", ")
-            let msg = "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?"
-            switchAlert = .running(newProject: next, message: msg)
+            switchAlert = .running(newProject: next, message: "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?")
         } else {
             projectManager.currentProject = next
         }
