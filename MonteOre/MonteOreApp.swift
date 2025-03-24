@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 // MARK: - Color Extensions
+
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -28,13 +29,14 @@ extension Color {
 
 extension UIColor {
     var toHex: String {
-        var r: CGFloat=0, g: CGFloat=0, b: CGFloat=0, a: CGFloat=0
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         self.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
+        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
 
-// MARK: - Alert Structures
+// MARK: - Alerts
+
 struct AlertError: Identifiable {
     var id: String { message }
     let message: String
@@ -50,6 +52,7 @@ enum ActiveAlert: Identifiable {
 }
 
 // MARK: - Data Models
+
 struct NoteRow: Identifiable, Codable {
     var id = UUID()
     var giorno: String   // e.g. "Giovedì 18/03/25"
@@ -326,6 +329,7 @@ class ProjectManager: ObservableObject {
 }
 
 // MARK: ExportData
+
 struct ExportData: Codable {
     let projects: [Project]
     let backupProjects: [Project]
@@ -350,7 +354,75 @@ extension ProjectManager {
     }
 }
 
+// MARK: - ImportConfirmationView
+
+struct ImportConfirmationView: View {
+    let message: String
+    let importAction: () -> Void
+    let cancelAction: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Importa File")
+                .font(.title)
+                .bold()
+            Text(message)
+                .multilineTextAlignment(.center)
+                .padding()
+            HStack {
+                Button(action: { cancelAction() }) {
+                    Text("Annulla")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red, lineWidth: 2))
+                }
+                Button(action: { importAction() }) {
+                    Text("Importa")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                }
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - ComeFunzionaSheetView
+
+struct ComeFunzionaSheetView: View {
+    let onDismiss: () -> Void
+    var body: some View {
+        VStack {
+            Text("""
+Se un'attività supera la mezzanotte, al termine l'app creerà un nuovo giorno. Modifica la nota con il pulsante in alto a destra e inserisci un orario oltre le 24 (es. 25:29) per registrare l'attività che si estende oltre la mezzanotte.
+            
+Ogni attività può avere una nota per differenziare tipologie di lavoro. Si consiglia di usare il formato: NomeProgetto NomeAttività.
+""")
+                .multilineTextAlignment(.center)
+                .padding()
+                .font(.custom("Permanent Marker", size: 20))
+            Button(action: { onDismiss() }) {
+                Text("Chiudi")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(30)
+    }
+}
+
 // MARK: - LabelAssignmentView
+
 struct LabelAssignmentView: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -410,6 +482,7 @@ struct LabelAssignmentView: View {
 }
 
 // MARK: - ActivityView
+
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
@@ -420,6 +493,7 @@ struct ActivityView: UIViewControllerRepresentable {
 }
 
 // MARK: - CombinedProjectEditSheet
+
 struct CombinedProjectEditSheet: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -483,6 +557,7 @@ struct CombinedProjectEditSheet: View {
 }
 
 // MARK: - ProjectEditToggleButton
+
 struct ProjectEditToggleButton: View {
     @Binding var isEditing: Bool
     var body: some View {
@@ -496,6 +571,7 @@ struct ProjectEditToggleButton: View {
 }
 
 // MARK: - ProjectRowView
+
 struct ProjectRowView: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
@@ -542,7 +618,8 @@ struct ProjectRowView: View {
     }
 }
 
-// MARK: - NoteView (Main Content)
+// MARK: - NoteView (Main Note Content)
+
 struct NoteView: View {
     @ObservedObject var project: Project
     var projectManager: ProjectManager
@@ -593,6 +670,7 @@ struct NoteView: View {
 }
 
 // MARK: - LabelHeaderView
+
 struct LabelHeaderView: View {
     let label: ProjectLabel
     @ObservedObject var projectManager: ProjectManager
@@ -686,7 +764,8 @@ struct LabelHeaderView: View {
     }
 }
 
-// MARK: - LabelsManagerView and Wrappers
+// MARK: - LabelsManagerView & Wrappers
+
 enum LabelActionType: Identifiable {
     case rename(label: ProjectLabel, initialText: String)
     case delete(label: ProjectLabel)
@@ -920,6 +999,7 @@ struct ChangeLabelColorDirectSheet: View {
 }
 
 // MARK: - ProjectManagerView
+
 struct ProjectManagerView: View {
     @ObservedObject var projectManager: ProjectManager
     @State private var newProjectName: String = ""
@@ -1057,9 +1137,7 @@ struct ProjectManagerView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showEtichetteSheet) {
-                LabelsManagerView(projectManager: projectManager)
-            }
+            .sheet(isPresented: $showEtichetteSheet) { LabelsManagerView(projectManager: projectManager) }
             .sheet(isPresented: $showShareSheet) {
                 if let exportURL = projectManager.getExportURL() {
                     ActivityView(activityItems: [exportURL])
@@ -1176,6 +1254,7 @@ struct ProjectManagerView: View {
 }
 
 // MARK: - NoNotesPromptView, PopupView, NonCHoSbattiSheetView
+
 struct NoNotesPromptView: View {
     var onOk: () -> Void
     var onNonCHoSbatti: () -> Void
@@ -1247,205 +1326,7 @@ struct NonCHoSbattiSheetView: View {
 }
 
 // MARK: - ContentView (Main)
-struct ContentView: View {
-    @ObservedObject var projectManager = ProjectManager()
-    @State private var showProjectManager: Bool = false
-    @State private var showNonCHoSbattiSheet: Bool = false
-    @State private var showPopup: Bool = false
-    @AppStorage("medalAwarded") private var medalAwarded: Bool = false
-    var body: some View {
-        GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
-            let showPrompt = projectManager.currentProject == nil
-            let isBackupProject = projectManager.currentProject.flatMap { proj in
-                projectManager.backupProjects.first(where: { $0.id == proj.id })
-            } != nil
-            ZStack {
-                Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
-                VStack(spacing: 20) {
-                    if showPrompt {
-                        NoNotesPromptView(onOk: { showProjectManager = true },
-                                          onNonCHoSbatti: { showNonCHoSbattiSheet = true })
-                    } else {
-                        if let project = projectManager.currentProject {
-                            NoteView(project: project, projectManager: projectManager)
-                        }
-                    }
-                    Button(action: { mainButtonTapped() }) {
-                        Text("Pigia il tempo")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                            .background(Circle().fill(Color.black))
-                    }
-                    .disabled(isBackupProject || projectManager.currentProject == nil)
-                    HStack {
-                        Button(action: { showProjectManager = true }) {
-                            Text("Gestione\nProgetti")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.white))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        Spacer()
-                        Button(action: { cycleProject() }) {
-                            Text("Cambia\nProgetto")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.yellow))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        .disabled(isBackupProject || projectManager.currentProject == nil)
-                    }
-                    .padding(.horizontal, isLandscape ? 10 : 30)
-                    .padding(.bottom, isLandscape ? 0 : 30)
-                }
-                if showPopup {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia Sbattimenti zero eh")
-                        .transition(.scale)
-                }
-            }
-            .sheet(isPresented: $showProjectManager) { ProjectManagerView(projectManager: projectManager) }
-            .sheet(isPresented: $showNonCHoSbattiSheet) {
-                NonCHoSbattiSheetView {
-                    if !medalAwarded {
-                        medalAwarded = true
-                        showPopup = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation { showPopup = false }
-                        }
-                    }
-                    showNonCHoSbattiSheet = false
-                }
-            }
-        }
-    }
-    
-    func cycleProject() {
-        let available: [Project]
-        if let locked = projectManager.lockedLabelID {
-            available = projectManager.projects.filter { $0.labelID == locked }
-        } else {
-            available = projectManager.projects
-        }
-        guard let current = projectManager.currentProject,
-              let idx = available.firstIndex(where: { $0.id == current.id }),
-              available.count > 1
-        else { return }
-        let next = available[(idx + 1) % available.count]
-        projectManager.currentProject = next
-    }
-    
-    func mainButtonTapped() {
-        guard let project = projectManager.currentProject else {
-            playSound(success: false)
-            return
-        }
-        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
-        let now = Date()
-        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
-        df.dateFormat = "EEEE dd/MM/yy"
-        let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
-        tf.dateFormat = "HH:mm"
-        let timeStr = tf.string(from: now)
-        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
-        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
-            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
-            project.noteRows.append(newRow)
-        } else {
-            guard var lastRow = project.noteRows.popLast() else { return }
-            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
-            else { lastRow.orari += " " + timeStr + "-" }
-            project.noteRows.append(lastRow)
-        }
-        projectManager.saveProjects()
-        playSound(success: true)
-    }
-    
-    func playSound(success: Bool) {
-        // Implement AVFoundation if desired
-    }
-}
 
-// MARK: - NoNotesPromptView, PopupView, NonCHoSbattiSheetView
-struct NoNotesPromptView: View {
-    var onOk: () -> Void
-    var onNonCHoSbatti: () -> Void
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Nessun progetto attivo")
-                .font(.title)
-                .bold()
-            Text("Per iniziare, crea o seleziona un progetto.")
-                .multilineTextAlignment(.center)
-            HStack(spacing: 20) {
-                Button(action: onOk) {
-                    Text("Crea/Seleziona Progetto")
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-                Button(action: onNonCHoSbatti) {
-                    Text("Non CHo Sbatti")
-                        .padding()
-                        .background(Color.orange)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-            }
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(radius: 8)
-    }
-}
-
-struct PopupView: View {
-    let message: String
-    var body: some View {
-        Text(message)
-            .font(.headline)
-            .foregroundColor(.white)
-            .padding()
-            .background(Color.black.opacity(0.8))
-            .cornerRadius(10)
-            .shadow(radius: 10)
-    }
-}
-
-struct NonCHoSbattiSheetView: View {
-    let onDismiss: () -> Void
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Frate, nemmeno io...")
-                .font(.custom("Permanent Marker", size: 28))
-                .bold()
-                .foregroundColor(.black)
-                .multilineTextAlignment(.center)
-            Button(action: { onDismiss() }) {
-                Text("Mh")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.green)
-                    .cornerRadius(8)
-            }
-        }
-        .padding(30)
-    }
-}
-
-// MARK: - ContentView (Main)
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
     @State private var showProjectManager: Bool = false
@@ -1574,6 +1455,7 @@ struct ContentView: View {
 }
 
 // MARK: - App Main
+
 @main
 struct MyTimeTrackerApp: App {
     var body: some Scene {
