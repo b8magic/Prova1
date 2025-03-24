@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 
-// MARK: - Color Extension and UIColor toHex conversion
+// MARK: - Color Extension e UIColor toHex conversion
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -179,15 +179,16 @@ class ProjectManager: ObservableObject {
         projects.append(p)
         currentProject = p
         saveProjects()
+        objectWillChange.send()
     }
     func renameProject(project: Project, newName: String) {
-        project.name = newName; saveProjects()
+        project.name = newName; saveProjects(); objectWillChange.send()
     }
     func deleteProject(project: Project) {
         if let idx = projects.firstIndex(where: { $0.id == project.id }) {
             projects.remove(at: idx)
             if currentProject?.id == project.id { currentProject = projects.first }
-            saveProjects()
+            saveProjects(); objectWillChange.send()
         }
     }
     
@@ -266,17 +267,17 @@ class ProjectManager: ObservableObject {
     // MARK: Labels Management
     func addLabel(title: String, color: String) {
         let l = ProjectLabel(title: title, color: color)
-        labels.append(l); saveLabels()
+        labels.append(l); saveLabels(); objectWillChange.send()
     }
     func renameLabel(label: ProjectLabel, newTitle: String) {
         if let idx = labels.firstIndex(where: { $0.id == label.id }) {
-            labels[idx].title = newTitle; saveLabels()
+            labels[idx].title = newTitle; saveLabels(); objectWillChange.send()
         }
     }
     func deleteLabel(label: ProjectLabel) {
         labels.removeAll(where: { $0.id == label.id })
         for p in projects { if p.labelID == label.id { p.labelID = nil } }
-        saveLabels(); saveProjects()
+        saveLabels(); saveProjects(); objectWillChange.send()
         if lockedLabelID == label.id { lockedLabelID = nil }
     }
     func saveLabels() {
@@ -375,58 +376,67 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+// MARK: - ModificationButtonStyle
+struct ModificationButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.title3)
+            .foregroundColor(.white)
+            .padding()
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(Color.blue)
+            .cornerRadius(8)
+    }
+}
+
 // MARK: - ProjectModificationSheet
 struct ProjectModificationSheet: View {
     @ObservedObject var project: Project
     @ObservedObject var projectManager: ProjectManager
+    var onDismiss: () -> Void
     @Environment(\.presentationMode) var presentationMode
     @State private var showRenameSheet = false
     @State private var showLabelAssignSheet = false
     @State private var showDeleteSheet = false
+    
     var body: some View {
-        // Bottoni disposti in orizzontale
         HStack(spacing: 10) {
             Button(action: { showRenameSheet = true }) {
                 Text("Rinomina")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .cornerRadius(8)
+                    .modifier(ModificationButtonStyle())
             }
             Button(action: { showLabelAssignSheet = true }) {
                 Text("Applica o\nrevoca etichetta")
-                    .font(.title3)
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.green)
-                    .cornerRadius(8)
+                    .modifier(ModificationButtonStyle())
             }
             Button(action: { showDeleteSheet = true }) {
                 Text("Elimina")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.red)
-                    .cornerRadius(8)
+                    .modifier(ModificationButtonStyle())
             }
         }
         .padding()
-        .sheet(isPresented: $showRenameSheet) {
+        .sheet(isPresented: $showRenameSheet, onDismiss: {
+            onDismiss()
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+        }) {
             RenameProjectSheet(project: project) { newName in
                 projectManager.renameProject(project: project, newName: newName)
+                onDismiss()
+                NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
             }
         }
         .sheet(isPresented: $showLabelAssignSheet) {
             LabelAssignmentView(project: project, projectManager: projectManager)
         }
-        .sheet(isPresented: $showDeleteSheet) {
+        .sheet(isPresented: $showDeleteSheet, onDismiss: {
+            onDismiss()
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+        }) {
             DeleteProjectSheet(project: project) {
                 projectManager.deleteProject(project: project)
+                onDismiss()
+                NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
             }
         }
     }
@@ -516,8 +526,8 @@ struct ProjectRowView: View {
     @State private var isHighlighted: Bool = false
     @State private var showModificationSheet: Bool = false
     var body: some View {
-        // Divido la riga in due aree: a sinistra il tappabile per aprire il progetto, a destra il bottone "Modifica"
         HStack(spacing: 0) {
+            // Zona tappabile per aprire il progetto
             Button(action: {
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -534,12 +544,18 @@ struct ProjectRowView: View {
                 .padding(.horizontal, 10)
             }
             .buttonStyle(PlainButtonStyle())
+            
             Divider().frame(width: 1).background(Color.gray)
-            Button("Modifica") {
+            
+            // Bottone "Modifica" con larghezza fissa
+            Button(action: {
                 showModificationSheet = true
+            }) {
+                Text("Modifica")
+                    .foregroundColor(.blue)
+                    .frame(width: 90, minHeight: 50)
+                    .padding(.vertical, 8)
             }
-            .foregroundColor(.blue)
-            .padding(.horizontal, 10)
         }
         .background(
             isHighlighted ?
@@ -548,7 +564,10 @@ struct ProjectRowView: View {
             : Color.clear
         )
         .sheet(isPresented: $showModificationSheet) {
-            ProjectModificationSheet(project: project, projectManager: projectManager)
+            ProjectModificationSheet(project: project, projectManager: projectManager, onDismiss: {
+                showModificationSheet = false
+                projectManager.objectWillChange.send()
+            })
         }
         .onDrag { NSItemProvider(object: project.id.uuidString as NSString) }
     }
@@ -570,7 +589,7 @@ struct LabelHeaderView: View {
                 .underline()
                 .foregroundColor(Color(hex: label.color))
             Spacer()
-            // Mostriamo il lucchetto solo se esistono progetti assegnati a questa etichetta e se non siamo nella sezione backup
+            // Mostriamo il lucchetto solo se siamo nella sezione correnti e se esistono progetti associati
             if !isBackup,
                projectManager.projects.contains(where: { $0.labelID == label.id }) {
                 Button(action: {
@@ -614,6 +633,7 @@ struct LabelHeaderView: View {
                                 if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
                                     projectManager.projects[index].labelID = label.id
                                     projectManager.saveProjects()
+                                    projectManager.objectWillChange.send()
                                     print("Progetto aggiornato con etichetta \(label.title)")
                                 }
                             }
@@ -627,7 +647,7 @@ struct LabelHeaderView: View {
     }
 }
 
-// MARK: - LabelsManagerView and related sheets
+// MARK: - RenameLabelSheet
 struct RenameLabelSheet: View {
     @Binding var label: ProjectLabel
     @Binding var newName: String
@@ -656,6 +676,7 @@ struct RenameLabelSheet: View {
     }
 }
 
+// MARK: - DeleteLabelSheet
 struct DeleteLabelSheet: View {
     let label: ProjectLabel
     var onDelete: () -> Void
@@ -692,6 +713,7 @@ struct DeleteLabelSheet: View {
     }
 }
 
+// MARK: - ChangeLabelColorSheet
 struct ChangeLabelColorSheet: View {
     @Binding var label: ProjectLabel
     @Binding var selectedColor: Color
@@ -722,6 +744,7 @@ struct ChangeLabelColorSheet: View {
     }
 }
 
+// MARK: - LabelsManagerView
 struct LabelsManagerView: View {
     @ObservedObject var projectManager: ProjectManager
     @Environment(\.presentationMode) var presentationMode
@@ -915,157 +938,6 @@ struct NoNotesPromptView: View {
     }
 }
 
-// MARK: - ContentView (Main)
-struct ContentView: View {
-    @ObservedObject var projectManager = ProjectManager()
-    @State private var switchAlert: ActiveAlert? = nil
-    @State private var showProjectManager: Bool = false
-    @State private var showNonCHoSbattiSheet: Bool = false
-    @State private var showPopup: Bool = false
-    @AppStorage("medalAwarded") private var medalAwarded: Bool = false
-    var body: some View {
-        GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
-            let showPrompt = projectManager.currentProject == nil
-            let isBackupProject = projectManager.currentProject.flatMap { proj in
-                projectManager.backupProjects.first(where: { $0.id == proj.id })
-            } != nil
-            ZStack {
-                Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
-                VStack(spacing: 20) {
-                    if showPrompt {
-                        NoNotesPromptView(onOk: { showProjectManager = true },
-                                          onNonCHoSbatti: { showNonCHoSbattiSheet = true })
-                    } else {
-                        if let project = projectManager.currentProject {
-                            ScrollView {
-                                NoteView(project: project, projectManager: projectManager)
-                                    .padding()
-                            }
-                            .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
-                                   height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
-                            .background(Color.white.opacity(0.2))
-                            .cornerRadius(25)
-                            .clipped()
-                        }
-                    }
-                    Button(action: { mainButtonTapped() }) {
-                        Text("Pigia il tempo")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                            .background(Circle().fill(Color.black))
-                    }
-                    .disabled(isBackupProject || projectManager.currentProject == nil)
-                    HStack {
-                        Button(action: { showProjectManager = true }) {
-                            Text("Gestione\nProgetti")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.white))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        Spacer()
-                        Button(action: { cycleProject() }) {
-                            Text("Cambia\nProgetto")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.yellow))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        .disabled(isBackupProject || projectManager.currentProject == nil)
-                    }
-                    .padding(.horizontal, isLandscape ? 10 : 30)
-                    .padding(.bottom, isLandscape ? 0 : 30)
-                }
-                if showPopup {
-                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
-                        .transition(.scale)
-                }
-            }
-            .sheet(isPresented: $showProjectManager) { ProjectManagerView(projectManager: projectManager) }
-            .sheet(isPresented: $showNonCHoSbattiSheet) {
-                NonCHoSbattiSheetView {
-                    if !medalAwarded {
-                        medalAwarded = true
-                        showPopup = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation { showPopup = false }
-                        }
-                    }
-                    showNonCHoSbattiSheet = false
-                }
-            }
-            .alert(item: $switchAlert) { (alert: ActiveAlert) in
-                switch alert {
-                case .running(let newProject, let message):
-                    return Alert(title: Text("Attenzione"),
-                                 message: Text(message),
-                                 primaryButton: .default(Text("Continua"), action: {
-                        projectManager.currentProject = newProject
-                    }),
-                                 secondaryButton: .cancel())
-                }
-            }
-        }
-    }
-    func cycleProject() {
-        let available: [Project]
-        if let locked = projectManager.lockedLabelID {
-            available = projectManager.projects.filter { $0.labelID == locked }
-        } else {
-            available = projectManager.projects
-        }
-        guard let current = projectManager.currentProject,
-              let idx = available.firstIndex(where: { $0.id == current.id }),
-              available.count > 1
-        else { return }
-        let next = available[(idx + 1) % available.count]
-        if projectManager.isProjectRunning(current) {
-            let running = available.filter { projectManager.isProjectRunning($0) }
-            let names = running.map { $0.name }.joined(separator: ", ")
-            let msg = "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?"
-            switchAlert = .running(newProject: next, message: msg)
-        } else {
-            projectManager.currentProject = next
-        }
-    }
-    func mainButtonTapped() {
-        guard let project = projectManager.currentProject else {
-            playSound(success: false); return
-        }
-        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
-        let now = Date()
-        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
-        df.dateFormat = "EEEE dd/MM/yy"
-        let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
-        tf.dateFormat = "HH:mm"
-        let timeStr = tf.string(from: now)
-        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
-        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
-            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
-            project.noteRows.append(newRow)
-        } else {
-            guard var lastRow = project.noteRows.popLast() else { return }
-            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
-            else { lastRow.orari += " " + timeStr + "-" }
-            project.noteRows.append(lastRow)
-        }
-        projectManager.saveProjects()
-        playSound(success: true)
-    }
-    func playSound(success: Bool) {
-        // Implementa AVFoundation se desiderato
-    }
-}
-
 // MARK: - NoteView
 struct NoteView: View {
     @ObservedObject var project: Project
@@ -1185,6 +1057,40 @@ L'uso dell'app è flessibile e adattabile alle proprie esigenze.
             }
         }
         .padding(30)
+    }
+}
+
+// MARK: - ImportConfirmationView
+struct ImportConfirmationView: View {
+    let message: String
+    let importAction: () -> Void
+    let cancelAction: () -> Void
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Importa File").font(.title).bold()
+            Text(message).multilineTextAlignment(.center).padding()
+            HStack {
+                Button(action: { cancelAction() }) {
+                    Text("Annulla")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red, lineWidth: 2))
+                }
+                Button(action: { importAction() }) {
+                    Text("Importa")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                }
+            }
+        }
+        .padding()
     }
 }
 
@@ -1376,45 +1282,195 @@ struct ProjectManagerView: View {
             }
         }
         .onAppear {
+            // Osserva la notifica per simulare il tap di "Cambia Progetto"
+            NotificationCenter.default.addObserver(forName: Notification.Name("CycleProjectNotification"), object: nil, queue: .main) { _ in
+                cycleProject()
+            }
             if let current = projectManager.currentProject,
                projectManager.backupProjects.contains(where: { $0.id == current.id }) {
                 // Eventuali azioni se il progetto corrente è di backup
             }
         }
     }
+    
+    func cycleProject() {
+        let available: [Project]
+        if let locked = projectManager.lockedLabelID {
+            available = projectManager.projects.filter { $0.labelID == locked }
+        } else {
+            available = projectManager.projects
+        }
+        guard let current = projectManager.currentProject,
+              let idx = available.firstIndex(where: { $0.id == current.id }),
+              available.count > 1
+        else { return }
+        let next = available[(idx + 1) % available.count]
+        if projectManager.isProjectRunning(current) {
+            let running = available.filter { projectManager.isProjectRunning($0) }
+            let names = running.map { $0.name }.joined(separator: ", ")
+            let msg = "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?"
+            // Mostra l'alert per avvertire
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+            // Se si conferma, cambia progetto (la logica dell'alert può essere ulteriormente raffinata)
+            projectManager.currentProject = next
+        } else {
+            projectManager.currentProject = next
+        }
+    }
 }
 
-// MARK: - ImportConfirmationView
-struct ImportConfirmationView: View {
-    let message: String
-    let importAction: () -> Void
-    let cancelAction: () -> Void
+// MARK: - ContentView (Main)
+struct ContentView: View {
+    @ObservedObject var projectManager = ProjectManager()
+    @State private var switchAlert: ActiveAlert? = nil
+    @State private var showProjectManager: Bool = false
+    @State private var showNonCHoSbattiSheet: Bool = false
+    @State private var showPopup: Bool = false
+    @AppStorage("medalAwarded") private var medalAwarded: Bool = false
+    
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Importa File").font(.title).bold()
-            Text(message).multilineTextAlignment(.center).padding()
-            HStack {
-                Button(action: { cancelAction() }) {
-                    Text("Annulla")
-                        .font(.title2)
-                        .foregroundColor(.red)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.white)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red, lineWidth: 2))
+        GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
+            let showPrompt = projectManager.currentProject == nil
+            let isBackupProject = projectManager.currentProject.flatMap { proj in
+                projectManager.backupProjects.first(where: { $0.id == proj.id })
+            } != nil
+            ZStack {
+                Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
+                VStack(spacing: 20) {
+                    if showPrompt {
+                        NoNotesPromptView(onOk: { showProjectManager = true },
+                                          onNonCHoSbatti: { showNonCHoSbattiSheet = true })
+                    } else {
+                        if let project = projectManager.currentProject {
+                            ScrollView {
+                                NoteView(project: project, projectManager: projectManager)
+                                    .padding()
+                            }
+                            .frame(width: isLandscape ? geometry.size.width : geometry.size.width - 40,
+                                   height: isLandscape ? geometry.size.height * 0.4 : geometry.size.height * 0.60)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(25)
+                            .clipped()
+                        }
+                    }
+                    Button(action: { mainButtonTapped() }) {
+                        Text("Pigia il tempo")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                            .background(Circle().fill(Color.black))
+                    }
+                    .disabled(isBackupProject || projectManager.currentProject == nil)
+                    HStack {
+                        Button(action: { showProjectManager = true }) {
+                            Text("Gestione\nProgetti")
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.black)
+                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                                .background(Circle().fill(Color.white))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                        }
+                        .background(Color(hex: "#54c0ff"))
+                        Spacer()
+                        Button(action: { cycleProject() }) {
+                            Text("Cambia\nProgetto")
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.black)
+                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                                .background(Circle().fill(Color.yellow))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                        }
+                        .background(Color(hex: "#54c0ff"))
+                        .disabled(isBackupProject || projectManager.currentProject == nil)
+                    }
+                    .padding(.horizontal, isLandscape ? 10 : 30)
+                    .padding(.bottom, isLandscape ? 0 : 30)
                 }
-                Button(action: { importAction() }) {
-                    Text("Importa")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.yellow)
-                        .cornerRadius(8)
+                if showPopup {
+                    PopupView(message: "Congratulazioni! Hai guadagnato la medaglia \"Sbattimenti zero eh\"")
+                        .transition(.scale)
+                }
+            }
+            .sheet(isPresented: $showProjectManager) { ProjectManagerView(projectManager: projectManager) }
+            .sheet(isPresented: $showNonCHoSbattiSheet) {
+                NonCHoSbattiSheetView {
+                    if !medalAwarded {
+                        medalAwarded = true
+                        showPopup = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            withAnimation { showPopup = false }
+                        }
+                    }
+                    showNonCHoSbattiSheet = false
+                }
+            }
+            .alert(item: $switchAlert) { (alert: ActiveAlert) in
+                switch alert {
+                case .running(let newProject, let message):
+                    return Alert(title: Text("Attenzione"),
+                                 message: Text(message),
+                                 primaryButton: .default(Text("Continua"), action: {
+                        projectManager.currentProject = newProject
+                    }),
+                                 secondaryButton: .cancel())
                 }
             }
         }
-        .padding()
+    }
+    
+    func cycleProject() {
+        let available: [Project]
+        if let locked = projectManager.lockedLabelID {
+            available = projectManager.projects.filter { $0.labelID == locked }
+        } else {
+            available = projectManager.projects
+        }
+        guard let current = projectManager.currentProject,
+              let idx = available.firstIndex(where: { $0.id == current.id }),
+              available.count > 1
+        else { return }
+        let next = available[(idx + 1) % available.count]
+        if projectManager.isProjectRunning(current) {
+            let running = available.filter { projectManager.isProjectRunning($0) }
+            let names = running.map { $0.name }.joined(separator: ", ")
+            let msg = "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?"
+            switchAlert = .running(newProject: next, message: msg)
+        } else {
+            projectManager.currentProject = next
+        }
+    }
+    
+    func mainButtonTapped() {
+        guard let project = projectManager.currentProject else {
+            playSound(success: false); return
+        }
+        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
+        let now = Date()
+        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
+        df.dateFormat = "EEEE dd/MM/yy"
+        let giornoStr = df.string(from: now).capitalized
+        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
+        tf.dateFormat = "HH:mm"
+        let timeStr = tf.string(from: now)
+        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
+        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
+            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
+            project.noteRows.append(newRow)
+        } else {
+            guard var lastRow = project.noteRows.popLast() else { return }
+            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
+            else { lastRow.orari += " " + timeStr + "-" }
+            project.noteRows.append(lastRow)
+        }
+        projectManager.saveProjects()
+        playSound(success: true)
+    }
+    
+    func playSound(success: Bool) {
+        // Implementa AVFoundation se desiderato
     }
 }
 
