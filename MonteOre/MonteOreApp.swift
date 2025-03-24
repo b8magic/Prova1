@@ -180,15 +180,18 @@ class ProjectManager: ObservableObject {
         currentProject = p
         saveProjects()
         objectWillChange.send()
+        NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
     func renameProject(project: Project, newName: String) {
         project.name = newName; saveProjects(); objectWillChange.send()
+        NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
     func deleteProject(project: Project) {
         if let idx = projects.firstIndex(where: { $0.id == project.id }) {
             projects.remove(at: idx)
             if currentProject?.id == project.id { currentProject = projects.first }
             saveProjects(); objectWillChange.send()
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         }
     }
     
@@ -268,10 +271,12 @@ class ProjectManager: ObservableObject {
     func addLabel(title: String, color: String) {
         let l = ProjectLabel(title: title, color: color)
         labels.append(l); saveLabels(); objectWillChange.send()
+        NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
     func renameLabel(label: ProjectLabel, newTitle: String) {
         if let idx = labels.firstIndex(where: { $0.id == label.id }) {
             labels[idx].title = newTitle; saveLabels(); objectWillChange.send()
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         }
     }
     func deleteLabel(label: ProjectLabel) {
@@ -279,6 +284,7 @@ class ProjectManager: ObservableObject {
         for p in projects { if p.labelID == label.id { p.labelID = nil } }
         saveLabels(); saveProjects(); objectWillChange.send()
         if lockedLabelID == label.id { lockedLabelID = nil }
+        NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
     }
     func saveLabels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -338,12 +344,15 @@ struct LabelAssignmentView: View {
                             .frame(width: 20, height: 20)
                         Text(label.title)
                         Spacer()
+                        // Highlight the entire row if selected
                         if project.labelID == label.id {
-                            Image(systemName: "checkmark")
+                            Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.blue)
                         }
                     }
-                    .contentShape(Rectangle())
+                    .padding(6)
+                    .background(project.labelID == label.id ? Color.blue.opacity(0.2) : Color.clear)
+                    .cornerRadius(8)
                     .onTapGesture {
                         withAnimation {
                             if project.labelID == label.id {
@@ -353,6 +362,8 @@ struct LabelAssignmentView: View {
                             }
                         }
                         projectManager.saveProjects()
+                        projectManager.objectWillChange.send()
+                        NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
                     }
                 }
             }
@@ -376,15 +387,15 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// MARK: - ModificationButtonStyle
-struct ModificationButtonStyle: ViewModifier {
+// MARK: - UniformModificationButtonStyle
+struct UniformModificationButtonStyle: ViewModifier {
+    var bgColor: Color
     func body(content: Content) -> some View {
         content
             .font(.title3)
             .foregroundColor(.white)
-            .padding()
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(Color.blue)
+            .frame(width: 110, height: 50)
+            .background(bgColor)
             .cornerRadius(8)
     }
 }
@@ -403,27 +414,31 @@ struct ProjectModificationSheet: View {
         HStack(spacing: 10) {
             Button(action: { showRenameSheet = true }) {
                 Text("Rinomina")
-                    .modifier(ModificationButtonStyle())
+                    .modifier(UniformModificationButtonStyle(bgColor: .blue))
             }
             Button(action: { showLabelAssignSheet = true }) {
-                Text("Applica o\nrevoca etichetta")
-                    .multilineTextAlignment(.center)
-                    .modifier(ModificationButtonStyle())
+                Text("Etichetta")
+                    .modifier(UniformModificationButtonStyle(bgColor: .green))
             }
             Button(action: { showDeleteSheet = true }) {
                 Text("Elimina")
-                    .modifier(ModificationButtonStyle())
+                    .modifier(UniformModificationButtonStyle(bgColor: .red))
             }
         }
         .padding()
+        .onChange(of: showRenameSheet) { newValue in
+            // When an inner sheet is dismissed, trigger the cycle action
+            if !newValue { onDismiss(); NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil) }
+        }
+        .onChange(of: showDeleteSheet) { newValue in
+            if !newValue { onDismiss(); NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil) }
+        }
         .sheet(isPresented: $showRenameSheet, onDismiss: {
             onDismiss()
-            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         }) {
             RenameProjectSheet(project: project) { newName in
                 projectManager.renameProject(project: project, newName: newName)
                 onDismiss()
-                NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
             }
         }
         .sheet(isPresented: $showLabelAssignSheet) {
@@ -431,12 +446,10 @@ struct ProjectModificationSheet: View {
         }
         .sheet(isPresented: $showDeleteSheet, onDismiss: {
             onDismiss()
-            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         }) {
             DeleteProjectSheet(project: project) {
                 projectManager.deleteProject(project: project)
                 onDismiss()
-                NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
             }
         }
     }
@@ -527,7 +540,7 @@ struct ProjectRowView: View {
     @State private var showModificationSheet: Bool = false
     var body: some View {
         HStack(spacing: 0) {
-            // Zona tappabile per aprire il progetto
+            // The project name button (opens project)
             Button(action: {
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -547,15 +560,15 @@ struct ProjectRowView: View {
             
             Divider().frame(width: 1).background(Color.gray)
             
-            // Bottone "Modifica" con larghezza fissa e altezza fissa
-            Button(action: {
-                showModificationSheet = true
-            }) {
+            // Small fixed "Modifica" button on the right
+            Button(action: { showModificationSheet = true }) {
                 Text("Modifica")
-                    .foregroundColor(.blue)
-                    .frame(width: 90, height: 50)
-                    .padding(.vertical, 8)
+                    .foregroundColor(.white)
+                    .frame(width: 80, height: 50)
+                    .background(Color.blue)
+                    .cornerRadius(8)
             }
+            .padding(.trailing, 5)
         }
         .background(
             Group {
@@ -597,7 +610,7 @@ struct LabelHeaderView: View {
                 .underline()
                 .foregroundColor(Color(hex: label.color))
             Spacer()
-            // Mostriamo il lucchetto solo se siamo nella sezione correnti e se esistono progetti associati
+            // In current projects only show padlock if there is at least one project assigned
             if !isBackup,
                projectManager.projects.contains(where: { $0.labelID == label.id }) {
                 Button(action: {
@@ -632,26 +645,29 @@ struct LabelHeaderView: View {
                     .padding()
                     .frame(width: 300)
                 }
-                .onDrop(of: [UTType.text.identifier], isTargeted: nil) { providers in
-                    providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { (data, error) in
-                        if let data = data as? Data,
-                           let idString = String(data: data, encoding: .utf8),
-                           let uuid = UUID(uuidString: idString) {
-                            DispatchQueue.main.async {
-                                if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
-                                    projectManager.projects[index].labelID = label.id
-                                    projectManager.saveProjects()
-                                    projectManager.objectWillChange.send()
-                                    print("Progetto aggiornato con etichetta \(label.title)")
-                                }
-                            }
-                        }
-                    }
-                    return true
-                }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        // ENLARGED DROP AREA for label assignment:
+        .frame(minHeight: 50)
+        .onDrop(of: [UTType.text.identifier], isTargeted: nil) { providers in
+            providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { (data, error) in
+                if let data = data as? Data,
+                   let idString = String(data: data, encoding: .utf8),
+                   let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let index = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
+                            projectManager.projects[index].labelID = label.id
+                            projectManager.saveProjects()
+                            projectManager.objectWillChange.send()
+                            print("Progetto aggiornato con etichetta \(label.title)")
+                            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
+                        }
+                    }
+                }
+            }
+            return true
+        }
     }
 }
 
@@ -1120,25 +1136,25 @@ struct ProjectManagerView: View {
         NavigationView {
             VStack {
                 List {
-                    // Sezione Progetti Correnti raggruppati per etichetta
+                    // Sezione Progetti Correnti
                     Section(header: Text("Progetti Correnti").font(.largeTitle).bold()) {
+                        // Show unlabeled projects (if any)
                         let unlabeled = projectManager.projects.filter { $0.labelID == nil }
                         if !unlabeled.isEmpty {
                             ForEach(unlabeled) { project in
                                 ProjectRowView(project: project, projectManager: projectManager)
                             }
                         }
+                        // Always show every label even if no project is assigned
                         ForEach(projectManager.labels) { label in
+                            LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
                             let projectsForLabel = projectManager.projects.filter { $0.labelID == label.id }
-                            if !projectsForLabel.isEmpty {
-                                LabelHeaderView(label: label, projectManager: projectManager, isBackup: false)
-                                ForEach(projectsForLabel) { project in
-                                    ProjectRowView(project: project, projectManager: projectManager)
-                                }
+                            ForEach(projectsForLabel) { project in
+                                ProjectRowView(project: project, projectManager: projectManager)
                             }
                         }
                     }
-                    // Sezione Mensilità Passate: raggruppa per etichetta solo se ci sono progetti
+                    // Sezione Mensilità Passate: Only show labels that actually have backup projects
                     Section(header: Text("Mensilità Passate").font(.largeTitle).bold()) {
                         let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
                         if !unlabeled.isEmpty {
@@ -1288,15 +1304,10 @@ struct ProjectManagerView: View {
             .sheet(isPresented: $showHowItWorksSheet, onDismiss: { showHowItWorksButton = false }) {
                 ComeFunzionaSheetView { showHowItWorksSheet = false }
             }
-        }
-        .onAppear {
-            // Osserva la notifica per simulare il tap di "Cambia Progetto"
-            NotificationCenter.default.addObserver(forName: Notification.Name("CycleProjectNotification"), object: nil, queue: .main) { _ in
-                cycleProject()
-            }
-            if let current = projectManager.currentProject,
-               projectManager.backupProjects.contains(where: { $0.id == current.id }) {
-                // Eventuali azioni se il progetto corrente è di backup
+            .onAppear {
+                NotificationCenter.default.addObserver(forName: Notification.Name("CycleProjectNotification"), object: nil, queue: .main) { _ in
+                    cycleProject()
+                }
             }
         }
     }
@@ -1316,42 +1327,11 @@ struct ProjectManagerView: View {
         if projectManager.isProjectRunning(current) {
             let running = available.filter { projectManager.isProjectRunning($0) }
             let names = running.map { $0.name }.joined(separator: ", ")
-            switchAlert = .running(newProject: next, message: "Attenzione: il tempo sta ancora scorrendo per i seguenti progetti: \(names). Vuoi continuare?")
+            // Trigger an alert if needed; here we use the existing notification method.
+            NotificationCenter.default.post(name: Notification.Name("CycleProjectNotification"), object: nil)
         } else {
             projectManager.currentProject = next
         }
-    }
-    
-    @State private var switchAlert: ActiveAlert? = nil
-    
-    func mainButtonTapped() {
-        guard let project = projectManager.currentProject else {
-            playSound(success: false); return
-        }
-        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
-        let now = Date()
-        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
-        df.dateFormat = "EEEE dd/MM/yy"
-        let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
-        tf.dateFormat = "HH:mm"
-        let timeStr = tf.string(from: now)
-        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
-        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
-            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
-            project.noteRows.append(newRow)
-        } else {
-            guard var lastRow = project.noteRows.popLast() else { return }
-            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
-            else { lastRow.orari += " " + timeStr + "-" }
-            project.noteRows.append(lastRow)
-        }
-        projectManager.saveProjects()
-        playSound(success: true)
-    }
-    
-    func playSound(success: Bool) {
-        // Implementa AVFoundation se desiderato
     }
 }
 
