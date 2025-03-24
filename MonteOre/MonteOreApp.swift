@@ -20,10 +20,10 @@ extension Color {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(.sRGB,
-                  red: Double(r)/255,
-                  green: Double(g)/255,
-                  blue: Double(b)/255,
-                  opacity: Double(a)/255)
+                  red: Double(r) / 255,
+                  green: Double(g) / 255,
+                  blue: Double(b) / 255,
+                  opacity: Double(a) / 255)
     }
 }
 
@@ -31,7 +31,7 @@ extension UIColor {
     var toHex: String {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         self.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
+        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
 
@@ -781,7 +781,7 @@ struct LabelHeaderView: View {
     }
 }
 
-// MARK: LabelsManagerView and Wrappers
+// MARK: LabelsManagerView & Wrappers
 
 enum LabelActionType: Identifiable {
     case rename(label: ProjectLabel, initialText: String)
@@ -1015,7 +1015,7 @@ struct ChangeLabelColorDirectSheet: View {
     }
 }
 
-// MARK: - ProjectManagerListView (Extracted List Subview)
+// MARK: - ProjectManagerListView
 
 struct ProjectManagerListView: View {
     @ObservedObject var projectManager: ProjectManager
@@ -1023,10 +1023,11 @@ struct ProjectManagerListView: View {
     var body: some View {
         List {
             Section(header:
-                        Text("Progetti Correnti")
-                            .font(.largeTitle)
-                            .bold()
-                            .padding(.top, 10)) {
+                Text("Progetti Correnti")
+                    .font(.largeTitle)
+                    .bold()
+                    .padding(.top, 10)
+            ) {
                 let unlabeled = projectManager.projects.filter { $0.labelID == nil }
                 if !unlabeled.isEmpty {
                     ForEach(unlabeled) { project in
@@ -1050,10 +1051,11 @@ struct ProjectManagerListView: View {
                 }
             }
             Section(header:
-                        Text("Mensilità Passate")
-                            .font(.largeTitle)
-                            .bold()
-                            .padding(.top, 40)) {
+                Text("Mensilità Passate")
+                    .font(.largeTitle)
+                    .bold()
+                    .padding(.top, 40)
+            ) {
                 let unlabeled = projectManager.backupProjects.filter { $0.labelID == nil }
                 if !unlabeled.isEmpty {
                     ForEach(unlabeled) { project in
@@ -1279,6 +1281,17 @@ struct ProjectManagerView: View {
     }
 }
 
+// MARK: - ActivityView Wrapper
+
+struct ActivityView: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 // MARK: - NoNotesPromptView, PopupView, NonCHoSbattiSheetView
 
 struct NoNotesPromptView: View {
@@ -1351,7 +1364,7 @@ struct NonCHoSbattiSheetView: View {
     }
 }
 
-// MARK: - ContentView (Main)
+// MARK: - ContentView
 
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
@@ -1372,45 +1385,11 @@ struct ContentView: View {
                     if showPrompt {
                         NoNotesPromptView(onOk: { showProjectManager = true },
                                           onNonCHoSbatti: { showNonCHoSbattiSheet = true })
-                    } else {
-                        if let project = projectManager.currentProject {
-                            NoteView(project: project, projectManager: projectManager)
-                        }
+                    } else if let project = projectManager.currentProject {
+                        NoteView(project: project, projectManager: projectManager)
                     }
-                    Button(action: { mainButtonTapped() }) {
-                        Text("Pigia il tempo")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                            .background(Circle().fill(Color.black))
-                    }
-                    .disabled(isBackupProject || projectManager.currentProject == nil)
-                    HStack {
-                        Button(action: { showProjectManager = true }) {
-                            Text("Gestione\nProgetti")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.white))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        Spacer()
-                        Button(action: { cycleProject() }) {
-                            Text("Cambia\nProgetto")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
-                                .background(Circle().fill(Color.yellow))
-                                .overlay(Circle().stroke(Color.black, lineWidth: 2))
-                        }
-                        .background(Color(hex: "#54c0ff"))
-                        .disabled(isBackupProject || projectManager.currentProject == nil)
-                    }
-                    .padding(.horizontal, isLandscape ? 10 : 30)
-                    .padding(.bottom, isLandscape ? 0 : 30)
+                    MainButtonView(isLandscape: isLandscape, projectManager: projectManager)
+                    BottomButtonsView(isLandscape: isLandscape, projectManager: projectManager, showProjectManager: $showProjectManager)
                 }
                 if showPopup {
                     PopupView(message: "Congratulazioni! Hai guadagnato la medaglia Sbattimenti zero eh")
@@ -1432,6 +1411,77 @@ struct ContentView: View {
             }
         }
     }
+}
+
+struct MainButtonView: View {
+    var isLandscape: Bool
+    @ObservedObject var projectManager: ProjectManager
+    var body: some View {
+        Button(action: { mainButtonTapped() }) {
+            Text("Pigia il tempo")
+                .font(.title2)
+                .foregroundColor(.white)
+                .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                .background(Circle().fill(Color.black))
+        }
+        .disabled(projectManager.currentProject == nil ||
+                  projectManager.backupProjects.contains(where: { $0.id == projectManager.currentProject?.id }))
+    }
+    
+    func mainButtonTapped() {
+        guard let project = projectManager.currentProject else { return }
+        let now = Date()
+        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT"); df.dateFormat = "EEEE dd/MM/yy"
+        let giornoStr = df.string(from: now).capitalized
+        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT"); tf.dateFormat = "HH:mm"
+        let timeStr = tf.string(from: now)
+        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
+        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
+            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
+            project.noteRows.append(newRow)
+        } else {
+            guard var lastRow = project.noteRows.popLast() else { return }
+            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
+            else { lastRow.orari += " " + timeStr + "-" }
+            project.noteRows.append(lastRow)
+        }
+        projectManager.saveProjects()
+    }
+}
+
+struct BottomButtonsView: View {
+    var isLandscape: Bool
+    @ObservedObject var projectManager: ProjectManager
+    @Binding var showProjectManager: Bool
+    var body: some View {
+        HStack {
+            Button(action: { showProjectManager = true }) {
+                Text("Gestione\nProgetti")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.black)
+                    .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                    .background(Circle().fill(Color.white))
+                    .overlay(Circle().stroke(Color.black, lineWidth: 2))
+            }
+            .background(Color(hex: "#54c0ff"))
+            Spacer()
+            Button(action: { cycleProject() }) {
+                Text("Cambia\nProgetto")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.black)
+                    .frame(width: isLandscape ? 90 : 140, height: isLandscape ? 100 : 140)
+                    .background(Circle().fill(Color.yellow))
+                    .overlay(Circle().stroke(Color.black, lineWidth: 2))
+            }
+            .background(Color(hex: "#54c0ff"))
+            .disabled(projectManager.currentProject == nil ||
+                      projectManager.backupProjects.contains(where: { $0.id == projectManager.currentProject?.id }))
+        }
+        .padding(.horizontal, isLandscape ? 10 : 30)
+        .padding(.bottom, isLandscape ? 0 : 30)
+    }
     
     func cycleProject() {
         let available: [Project]
@@ -1447,38 +1497,9 @@ struct ContentView: View {
         let next = available[(idx + 1) % available.count]
         projectManager.currentProject = next
     }
-    
-    func mainButtonTapped() {
-        guard let project = projectManager.currentProject else {
-            playSound(success: false)
-            return
-        }
-        if projectManager.backupProjects.contains(where: { $0.id == project.id }) { return }
-        let now = Date()
-        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
-        df.dateFormat = "EEEE dd/MM/yy"
-        let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
-        tf.dateFormat = "HH:mm"
-        let timeStr = tf.string(from: now)
-        projectManager.backupCurrentProjectIfNeeded(project, currentDate: now, currentGiorno: giornoStr)
-        if project.noteRows.isEmpty || project.noteRows.last?.giorno != giornoStr {
-            let newRow = NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
-            project.noteRows.append(newRow)
-        } else {
-            guard var lastRow = project.noteRows.popLast() else { return }
-            if lastRow.orari.hasSuffix("-") { lastRow.orari += timeStr }
-            else { lastRow.orari += " " + timeStr + "-" }
-            project.noteRows.append(lastRow)
-        }
-        projectManager.saveProjects()
-        playSound(success: true)
-    }
-    
-    func playSound(success: Bool) {
-        // Implement AVFoundation if desired
-    }
 }
+
+// MARK: ActivityView Wrapper (already defined above)
 
 // MARK: - App Main
 
