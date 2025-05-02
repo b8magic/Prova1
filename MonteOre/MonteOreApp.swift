@@ -1311,7 +1311,7 @@ struct ProjectManagerView: View {
     @State private var showEtichetteSheet = false
     @State private var showImportSheet = false
     @State private var importError: AlertError? = nil
-    @State private var pendingImportData: ImportConfirmationView.ImportData? = nil
+    @State private var pendingImportData: ImportData? = nil
     @State private var showImportConfirmation = false
 
     @State private var showHowItWorksSheet = false
