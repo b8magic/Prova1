@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Color Extensions
+// MARK: - Color Extensions.
 
 extension Color {
     init(hex: String) {
