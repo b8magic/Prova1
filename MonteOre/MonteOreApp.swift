@@ -264,7 +264,7 @@ class ProjectManager: ObservableObject {
         }
     }
 
-    private func getURLForBackup(project: Project) -> URL {
+    func getURLForBackup(project: Project) -> URL {
         FileManager.default
           .urls(for: .documentDirectory, in: .userDomainMask)[0]
           .appendingPathComponent("\(project.name).json")
@@ -744,7 +744,7 @@ struct LabelHeaderView: View {
                 .foregroundColor(.black)
             }
             .buttonStyle(PlainButtonStyle())
-            /* 
+            /*
             .popover(isPresented: $showLockInfo, arrowEdge: .bottom) {
                 VStack(spacing: 20) {
                     Text("Il pulsante è agganciato ai progetti dell'etichetta \(label.title)")
