@@ -472,7 +472,7 @@ class ProjectManager: ObservableObject {
           name: Notification.Name("CycleProjectNotification"),
           object: nil)
     }
-    private func cleanupEmptyLock() {
+    func cleanupEmptyLock() {
         if let lid = lockedLabelID {
             let has = projects.contains { $0.labelID == lid }
             if !has {
