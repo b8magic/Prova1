@@ -791,7 +791,7 @@ struct ProjectRowView: View {
 
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    withAnimation(.easeOut(duration: .2)) {
+                    withAnimation(.easeOut(duration: 0.2)) {
                         isHighlighted = false
                     }
                     projectManager.lockedBackupLabelID = nil
