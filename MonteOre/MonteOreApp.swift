@@ -637,19 +637,19 @@ class ProjectManager: ObservableObject {
     }
     func cleanupEmptyLock() {
         if let lid = lockedLabelID {
-            let hasCurr = projects.contains {
+            let hasInCurr = projects.contains {
                 $0.labelID == lid
             }
-            if !hasCurr {
+            if !hasInCurr {
                 lockedLabelID = nil
                 currentProject = projects.first
             }
         }
         if let lid = lockedBackupLabelID {
-            let hasBack = backupProjects.contains {
+            let hasInBack = backupProjects.contains {
                 $0.labelID == lid
             }
-            if !hasBack {
+            if !hasInBack {
                 lockedBackupLabelID = nil
                 currentProject = projects.first
             }
@@ -885,7 +885,7 @@ struct ProjectRowView: View {
                 }
                 DispatchQueue.main.asyncAfter(deadline:
                   .now() + 0.2) {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(.easeOut(duration: .2)) {
                         isHighlighted = false
                     }
                     projectManager.lockedBackupLabelID = nil
@@ -982,7 +982,6 @@ struct LabelHeaderView: View {
                     if isBackup {
                         if projectManager.lockedBackupLabelID == label.id {
                             projectManager.lockedBackupLabelID = nil
-                            // return to first unlocked project
                             projectManager.currentProject = projectManager.projects.first
                         } else {
                             projectManager.lockedBackupLabelID = label.id
@@ -1355,14 +1354,15 @@ struct NoteView: View {
     @State private var editMode = false
     @State private var editedRows: [NoteRow] = []
 
+    // Updated computed property with guard-based logic:
     private var projectNameColor: Color {
-        if let lid = project.labelID,
-           let hex = projectManager.labels
-             .first(where: { $0.id == lid })?.color
-        {
-            return Color(hex: hex)
+        guard let lid = project.labelID else {
+            return .black
         }
-        return .black
+        guard let label = projectManager.labels.first(where: { $0.id == lid }) else {
+            return .black
+        }
+        return Color(hex: label.color)
     }
 
     var body: some View {
@@ -2198,7 +2198,6 @@ struct ContentView: View {
                                 {
                                     projectManager.currentProject = first
                                 } else {
-                                    // fallback
                                     projectManager.currentProject =
                                       projectManager.projects.first
                                 }
@@ -2447,11 +2446,9 @@ struct ContentView: View {
            || proj.noteRows.last?.giorno != giornoStr
         {
             proj.noteRows.append(
-              NoteRow(
-                giorno: giornoStr,
-                orari: timeStr + "-",
-                note: ""
-              )
+              NoteRow(giorno: giornoStr,
+                      orari: timeStr + "-",
+                      note: "")
             )
         } else {
             var last = proj.noteRows.removeLast()
