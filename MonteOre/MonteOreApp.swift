@@ -2125,197 +2125,83 @@ struct NonCHoSbattiSheetView: View {
 // MARK: - ContentView with persistent managerView
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
-
     @State private var showProjectManager = false
     @State private var projectManagerView: ProjectManagerView?
-
     @State private var showNonCHoSbattiSheet = false
     @State private var showPopup = false
     @AppStorage("medalAwarded") private var medalAwarded = false
 
     var body: some View {
         GeometryReader { geo in
-            let isLandscape = geo.size.width > geo.size.height
-            let noProj = projectManager.currentProject == nil
-            let isBackup = projectManager.currentProject.flatMap { proj in
-                projectManager.backupProjects.first {
-                    $0.id == proj.id
-                }
-            } != nil
-
             ZStack {
-                Color(hex: "#54c0ff")
-                    .edgesIgnoringSafeArea(.all)
-
+                Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
                 VStack(spacing: 20) {
-                    if noProj {
-                        NoNotesPromptView(
-                          onOk: { presentManager() },
-                          onNonCHoSbatti: {
-                            showNonCHoSbattiSheet = true
-                          }
-                        )
-                    } else if let proj = projectManager.currentProject {
-                        NoteView(
-                          project: proj,
-                          projectManager: projectManager
-                        )
-                        .frame(
-                          width: isLandscape
-                            ? geo.size.width
-                            : geo.size.width - 40,
-                          height: isLandscape
-                            ? geo.size.height * 0.4
-                            : geo.size.height * 0.6
-                        )
-                        .cornerRadius(25)
-                        .clipped()
-                    }
+                    HeaderView(projectManager: projectManager,
+                               showProjectManager: $showProjectManager,
+                               showNonCHoSbattiSheet: $showNonCHoSbattiSheet,
+                               showPopup: $showPopup,
+                               medalAwarded: $medalAwarded,
+                               projectManagerView: $projectManagerView)
 
-                    // Pigia il tempo & Torna ai progetti correnti
-                    ZStack {
-                        Button(action: { mainButtonTapped() }) {
-                            Text("Pigia il tempo")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(
-                                  width: isLandscape ? 100 : 140,
-                                  height: isLandscape ? 100 : 140
-                                )
-                                .background(Circle().fill(Color.black))
-                        }
-                        .disabled(
-                            isBackup
-                            || projectManager.currentProject == nil
-                        )
+                    TimerControlView(projectManager: projectManager)
 
-                        if isBackup {
-                            Button(action: {
-                                // if a current-label is locked, go to its first
-                                if let lid = projectManager.lockedLabelID,
-                                   let first = projectManager.projects
-                                    .first(where: { $0.labelID == lid })
-                                {
-                                    projectManager.currentProject = first
-                                } else {
-                                    projectManager.currentProject =
-                                      projectManager.projects.first
-                                }
-                                projectManager.lockedBackupLabelID = nil
-                            }) {
-                                Text("Torna ai progetti correnti")
-                                    .multilineTextAlignment(.center)
-                                    .foregroundColor(.black)
-                                    .frame(
-                                      width: isLandscape ? 100 : 140,
-                                      height: isLandscape ? 100 : 140
-                                    )
-                                    .background(
-                                      Circle().fill(
-                                        Color(hex: "#54c0ff")
-                                      )
-                                    )
-                            }
-                        }
-                    }
-
-                    // Gestione Progetti & Split Arrows
-                    HStack {
-                        Button(action: { presentManager() }) {
-                            Text("Gestione\nProgetti")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                                .frame(
-                                  width: isLandscape ? 90 : 140,
-                                  height: isLandscape ? 100 : 140
-                                )
-                                .background(Circle().fill(Color.white))
-                                .overlay(
-                                  Circle().stroke(
-                                    Color.black, lineWidth: 2
-                                  )
-                                )
-                        }
-                        .contentShape(Rectangle())
-
-                        Spacer()
-
-                        ZStack {
-                            Circle()
-                                .fill(Color.yellow)
-                                .frame(
-                                  width: isLandscape ? 90 : 140,
-                                  height: isLandscape ? 90 : 140
-                                )
-                                .overlay(
-                                  Rectangle()
-                                    .frame(
-                                        width: isLandscape ? 90 : 140,
-                                        height: 1
-                                    ),
-                                  alignment: .center
-                                )
-
-                            VStack(spacing: 0) {
-                                Button(action: previousProject) {
-                                    Color.clear
-                                }
-                                .frame(
-                                  height: isLandscape ? 45 : 70
-                                )
-                                Button(action: cycleProject) {
-                                    Color.clear
-                                }
-                                .frame(
-                                  height: isLandscape ? 45 : 70
-                                )
-                            }
-
-                            VStack {
-                                Image(systemName: "chevron.up")
-                                    .font(.title2)
-                                    .padding(.top, 16)
-                                Spacer()
-                                Image(systemName: "chevron.down")
-                                    .font(.title2)
-                                    .padding(.bottom, 16)
-                            }
-                        }
-                    }
-                    .padding(
-                      .horizontal,
-                      isLandscape ? 10 : 30
-                    )
-                    .padding(
-                      .bottom,
-                      isLandscape ? 0 : 30
-                    )
+                    FooterView(projectManager: projectManager,
+                               showProjectManager: $showProjectManager,
+                               projectManagerView: $projectManagerView)
                 }
-
-                if showPopup {
-                    PopupView(
-                      message:
-                        "Congratulazioni! Hai guadagnato la medaglia “Sbattimenti zero eh”"
-                    )
-                    .transition(.scale)
+            }
+            .sheet(isPresented: $showProjectManager) {
+                projectManagerView
+            }
+            .sheet(isPresented: $showNonCHoSbattiSheet) {
+                NonCHoSbattiSheetView {
+                    if !medalAwarded {
+                        medalAwarded = true
+                        showPopup = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            withAnimation { showPopup = false }
+                        }
+                    }
+                    showNonCHoSbattiSheet = false
                 }
             }
         }
-        .sheet(isPresented: $showProjectManager) {
-            projectManagerView
-        }
-        .sheet(isPresented: $showNonCHoSbattiSheet) {
-            NonCHoSbattiSheetView {
-                if !medalAwarded {
-                    medalAwarded = true
-                    showPopup = true
-                    DispatchQueue.main.asyncAfter(deadline:
-                      .now() + 5) {
-                        withAnimation { showPopup = false }
-                    }
-                }
-                showNonCHoSbattiSheet = false
+    }
+}
+
+// MARK: – Subviews for ContentView
+
+private struct HeaderView: View {
+    @ObservedObject var projectManager: ProjectManager
+    @Binding var showProjectManager: Bool
+    @Binding var showNonCHoSbattiSheet: Bool
+    @Binding var showPopup: Bool
+    @Binding var medalAwarded: Bool
+    @Binding var projectManagerView: ProjectManagerView?
+
+    var body: some View {
+        let noProj = projectManager.currentProject == nil
+        let isBackup = projectManager.currentProject.flatMap { proj in
+            projectManager.backupProjects.first { $0.id == proj.id }
+        } != nil
+
+        VStack(spacing: 20) {
+            if noProj {
+                NoNotesPromptView(
+                    onOk: presentManager,
+                    onNonCHoSbatti: { showNonCHoSbattiSheet = true }
+                )
+            } else if let proj = projectManager.currentProject {
+                NoteView(project: proj, projectManager: projectManager)
+                    .frame(maxWidth: .infinity,
+                           maxHeight:  isBackup ? 300 : 400)
+            }
+
+            if showPopup {
+                PopupView(message:
+                    "Congratulazioni! Hai guadagnato la medaglia “Sbattimenti zero eh”"
+                )
+                .transition(.scale)
             }
         }
     }
@@ -2323,113 +2209,45 @@ struct ContentView: View {
     private func presentManager() {
         if projectManagerView == nil {
             projectManagerView =
-              ProjectManagerView(projectManager:
-                                   projectManager)
+              ProjectManagerView(projectManager: projectManager)
         }
         showProjectManager = true
     }
+}
 
-    private func cycleProject() {
-        guard let cur = projectManager.currentProject else {
-            return
-        }
-        let isBackup = projectManager.backupProjects.contains {
-            $0.id == cur.id
-        }
+private struct TimerControlView: View {
+    @ObservedObject var projectManager: ProjectManager
 
-        if isBackup,
-           let lockedB =
-             projectManager.lockedBackupLabelID
-        {
-            let arr = projectManager.backupProjects
-                .filter { $0.labelID == lockedB }
-            guard let idx = arr.firstIndex(
-              where: { $0.id == cur.id }),
-                  arr.count > 1
-            else { return }
-            projectManager.currentProject =
-              arr[(idx + 1) % arr.count]
-            return
-        }
-        if !isBackup,
-           let lockedC = projectManager.lockedLabelID
-        {
-            let arr = projectManager.projects
-                .filter { $0.labelID == lockedC }
-            guard let idx = arr.firstIndex(
-              where: { $0.id == cur.id }),
-                  arr.count > 1
-            else { return }
-            projectManager.currentProject =
-              arr[(idx + 1) % arr.count]
-            return
-        }
+    var body: some View {
+        let isBackup = projectManager.currentProject.flatMap { proj in
+            projectManager.backupProjects.first { $0.id == proj.id }
+        } != nil
 
-        let arr = isBackup
-            ? projectManager.displayedBackupProjects()
-            : projectManager.displayedCurrentProjects()
-        guard let idx = arr.firstIndex(
-          where: { $0.id == cur.id }),
-              arr.count > 1
-        else { return }
-        projectManager.currentProject =
-          arr[(idx + 1) % arr.count]
-    }
+        ZStack {
+            Button(action: mainButtonTapped) {
+                Text("Pigia il tempo")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .frame(width: 140, height: 140)
+                    .background(Circle().fill(Color.black))
+            }
+            .disabled(isBackup || projectManager.currentProject == nil)
 
-    private func previousProject() {
-        guard let cur = projectManager.currentProject else {
-            return
+            if isBackup {
+                Button(action: returnToCurrent) {
+                    Text("Torna ai progetti correnti")
+                        .font(.caption)
+                        .foregroundColor(.black)
+                        .frame(width: 140, height: 140)
+                        .background(Circle().fill(Color(hex: "#54c0ff")))
+                }
+            }
         }
-        let isBackup = projectManager.backupProjects.contains {
-            $0.id == cur.id
-        }
-
-        if isBackup,
-           let lockedB =
-             projectManager.lockedBackupLabelID
-        {
-            let arr = projectManager.backupProjects
-                .filter { $0.labelID == lockedB }
-            guard let idx = arr.firstIndex(
-              where: { $0.id == cur.id }),
-                  arr.count > 1
-            else { return }
-            projectManager.currentProject =
-              arr[(idx - 1 + arr.count) % arr.count]
-            return
-        }
-        if !isBackup,
-           let lockedC = projectManager.lockedLabelID
-        {
-            let arr = projectManager.projects
-                .filter { $0.labelID == lockedC }
-            guard let idx = arr.firstIndex(
-              where: { $0.id == cur.id }),
-                  arr.count > 1
-            else { return }
-            projectManager.currentProject =
-              arr[(idx - 1 + arr.count) % arr.count]
-            return
-        }
-
-        let arr = isBackup
-            ? projectManager.displayedBackupProjects()
-            : projectManager.displayedCurrentProjects()
-        guard let idx = arr.firstIndex(
-          where: { $0.id == cur.id }),
-              arr.count > 1
-        else { return }
-        projectManager.currentProject =
-          arr[(idx - 1 + arr.count) % arr.count]
     }
 
     private func mainButtonTapped() {
-        guard let proj = projectManager.currentProject else {
-            playSound(success: false)
-            return
-        }
-        if projectManager.backupProjects.contains(where: {
-           $0.id == proj.id }) { return }
+        guard let proj = projectManager.currentProject else { return }
+        if projectManager.backupProjects.contains(where: { $0.id == proj.id }) { return }
         let now = Date()
         let df = DateFormatter()
         df.locale = Locale(identifier: "it_IT")
@@ -2440,15 +2258,11 @@ struct ContentView: View {
         tf.dateFormat = "HH:mm"
         let timeStr = tf.string(from: now)
         projectManager.backupCurrentProjectIfNeeded(
-          proj, currentDate: now,
-          currentGiorno: giornoStr)
-        if proj.noteRows.isEmpty
-           || proj.noteRows.last?.giorno != giornoStr
-        {
+            proj, currentDate: now, currentGiorno: giornoStr
+        )
+        if proj.noteRows.isEmpty || proj.noteRows.last?.giorno != giornoStr {
             proj.noteRows.append(
-              NoteRow(giorno: giornoStr,
-                      orari: timeStr + "-",
-                      note: "")
+                NoteRow(giorno: giornoStr, orari: timeStr + "-", note: "")
             )
         } else {
             var last = proj.noteRows.removeLast()
@@ -2460,11 +2274,111 @@ struct ContentView: View {
             proj.noteRows.append(last)
         }
         projectManager.saveProjects()
-        playSound(success: true)
+        // playSound if desired
     }
 
-    private func playSound(success: Bool) {
-        // AVFoundation if desired
+    private func returnToCurrent() {
+        if let lid = projectManager.lockedLabelID,
+           let first = projectManager.projects.first(where: { $0.labelID == lid }) {
+            projectManager.currentProject = first
+        } else {
+            projectManager.currentProject = projectManager.projects.first
+        }
+        projectManager.lockedBackupLabelID = nil
+    }
+}
+
+private struct FooterView: View {
+    @ObservedObject var projectManager: ProjectManager
+    @Binding var showProjectManager: Bool
+    @Binding var projectManagerView: ProjectManagerView?
+
+    var body: some View {
+        HStack {
+            Button(action: presentManager) {
+                Text("Gestione\nProgetti")
+                    .multilineTextAlignment(.center)
+                    .frame(width: 140, height: 140)
+                    .background(Circle().fill(Color.white))
+                    .overlay(Circle().stroke(Color.black, lineWidth: 2))
+            }
+            Spacer()
+            SplitArrowView(projectManager: projectManager)
+        }
+        .padding(.horizontal, 30)
+    }
+
+    private func presentManager() {
+        if projectManagerView == nil {
+            projectManagerView =
+              ProjectManagerView(projectManager:
+                                   projectManager)
+        }
+        showProjectManager = true
+    }
+}
+
+private struct SplitArrowView: View {
+    @ObservedObject var projectManager: ProjectManager
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Color.yellow).frame(width: 140, height: 140)
+            Rectangle()
+                .frame(width: 140, height: 1)
+            VStack(spacing: 0) {
+                Button(action: previousProject) { Color.clear.frame(height: 70) }
+                Button(action: nextProject)     { Color.clear.frame(height: 70) }
+            }
+            VStack {
+                Image(systemName: "chevron.up").padding(.top, 16)
+                Spacer()
+                Image(systemName: "chevron.down").padding(.bottom, 16)
+            }
+        }
+    }
+
+    private func nextProject() {
+        guard let cur = projectManager.currentProject else { return }
+        let isBackup = projectManager.backupProjects.contains { $0.id == cur.id }
+        if isBackup, let lid = projectManager.lockedBackupLabelID {
+            cycle(in: projectManager.backupProjects.filter{ $0.labelID == lid }, current: cur)
+            return
+        }
+        if let lid = projectManager.lockedLabelID {
+            cycle(in: projectManager.projects.filter{ $0.labelID == lid }, current: cur)
+            return
+        }
+        let all = isBackup
+            ? projectManager.displayedBackupProjects()
+            : projectManager.displayedCurrentProjects()
+        cycle(in: all, current: cur)
+    }
+
+    private func previousProject() {
+        guard let cur = projectManager.currentProject else { return }
+        let isBackup = projectManager.backupProjects.contains { $0.id == cur.id }
+        if isBackup, let lid = projectManager.lockedBackupLabelID {
+            cycle(in: projectManager.backupProjects.filter{ $0.labelID == lid }, current: cur, forward: false)
+            return
+        }
+        if let lid = projectManager.lockedLabelID {
+            cycle(in: projectManager.projects.filter{ $0.labelID == lid }, current: cur, forward: false)
+            return
+        }
+        let all = isBackup
+            ? projectManager.displayedBackupProjects()
+            : projectManager.displayedCurrentProjects()
+        cycle(in: all, current: cur, forward: false)
+    }
+
+    private func cycle(in arr: [Project], current: Project, forward: Bool = true) {
+        guard let idx = arr.firstIndex(where:{ $0.id == current.id }),
+              arr.count > 1 else { return }
+        let next = forward
+            ? arr[(idx + 1) % arr.count]
+            : arr[(idx - 1 + arr.count) % arr.count]
+        projectManager.currentProject = next
     }
 }
 
