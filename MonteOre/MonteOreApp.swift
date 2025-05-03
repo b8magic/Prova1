@@ -65,9 +65,9 @@ struct NoteRow: Identifiable, Codable {
     var giorno: String
     var orari: String
     var note: String = ""
-
+    
     enum CodingKeys: String, CodingKey { case id, giorno, orari, note }
-
+    
     init(giorno: String, orari: String, note: String = "") {
         self.giorno = giorno; self.orari = orari; self.note = note
     }
@@ -78,15 +78,12 @@ struct NoteRow: Identifiable, Codable {
         orari  = try c.decode(String.self, forKey: .orari)
         note   = (try? c.decode(String.self, forKey: .note)) ?? ""
     }
-
     var totalMinutes: Int {
         orari.split(separator: " ").reduce(0) { sum, seg in
-            let parts = seg.split(separator: "-")
-            guard parts.count == 2,
-                  let s = minutes(from: String(parts[0])),
-                  let e = minutes(from: String(parts[1])) else {
-                return sum
-            }
+            let p = seg.split(separator: "-")
+            guard p.count == 2,
+                  let s = minutes(from: String(p[0])),
+                  let e = minutes(from: String(p[1])) else { return sum }
             return sum + max(0, e - s)
         }
     }
@@ -113,9 +110,9 @@ class Project: Identifiable, ObservableObject, Codable {
     @Published var name: String
     @Published var noteRows: [NoteRow]
     var labelID: UUID? = nil
-
+    
     enum CodingKeys: CodingKey { case id, name, noteRows, labelID }
-
+    
     init(name: String) {
         self.name = name
         self.noteRows = []
@@ -134,7 +131,6 @@ class Project: Identifiable, ObservableObject, Codable {
         try c.encode(noteRows, forKey: .noteRows)
         try c.encode(labelID,  forKey: .labelID)
     }
-
     var totalProjectMinutes: Int {
         noteRows.reduce(0) { $0 + $1.totalMinutes }
     }
@@ -155,7 +151,7 @@ class ProjectManager: ObservableObject {
     @Published var projects: [Project] = []
     @Published var backupProjects: [Project] = []
     @Published var labels: [ProjectLabel] = []
-
+    
     @Published var currentProject: Project? {
         didSet {
             if let cp = currentProject {
@@ -186,31 +182,28 @@ class ProjectManager: ObservableObject {
             }
         }
     }
-
-    let projectsFileName    = "projects.json"
-    let backupOrderFileName = "backupOrder.json"
-
+    
+    private let projectsFileName    = "projects.json"
+    private let backupOrderFileName = "backupOrder.json"
+    
     init() {
         loadProjects()
         loadBackupProjects()
         loadBackupOrder()
         loadLabels()
-
-        if let s = UserDefaults.standard.string(forKey: "lockedLabelID"),
+        if let s = UserDefaults.standard.string(
+           forKey: "lockedLabelID"),
            let u = UUID(uuidString: s) {
             lockedLabelID = u
         }
         if let s = UserDefaults.standard.string(
            forKey: "lockedBackupLabelID"),
-           let u = UUID(uuidString: s)
-        {
+           let u = UUID(uuidString: s) {
             lockedBackupLabelID = u
         }
-
         if let lastId = UserDefaults.standard.string(
            forKey: "lastProjectId"),
-           let uuid = UUID(uuidString: lastId)
-        {
+           let uuid = UUID(uuidString: lastId) {
             if let p = projects.first(where: { $0.id == uuid }) {
                 currentProject = p
             } else if let b = backupProjects.first(where: {
@@ -222,15 +215,13 @@ class ProjectManager: ObservableObject {
         } else {
             currentProject = projects.first
         }
-
         if projects.isEmpty {
             currentProject = nil
             saveProjects()
         }
-
         cleanupEmptyLock()
     }
-
+    
     // MARK: Projects
     func addProject(name: String) {
         let p = Project(name: name)
@@ -260,7 +251,7 @@ class ProjectManager: ObservableObject {
             postCycleNotification()
         }
     }
-
+    
     // MARK: Backup
     func deleteBackupProject(project: Project) {
         let url = getURLForBackup(project: project)
@@ -310,7 +301,6 @@ class ProjectManager: ObservableObject {
               last.giorno != currentGiorno,
               let d = project.dateFromGiorno(last.giorno)
         else { return }
-
         let cal = Calendar.current
         if cal.component(.month, from: d) !=
            cal.component(.month, from: currentDate)
@@ -323,7 +313,6 @@ class ProjectManager: ObservableObject {
             let name = "\(project.name) \(m) \(y)"
             let backup = Project(name: name)
             backup.noteRows = project.noteRows
-
             let url = getURLForBackup(project: backup)
             do {
                 let d = try JSONEncoder().encode(backup)
@@ -414,7 +403,7 @@ class ProjectManager: ObservableObject {
             }
         }
     }
-
+    
     // MARK: Labels
     func addLabel(title: String, color: String) {
         let l = ProjectLabel(title: title, color: color)
@@ -464,7 +453,7 @@ class ProjectManager: ObservableObject {
             labels = arr
         }
     }
-
+    
     // MARK: Reordering
     func moveProjects(forLabel labelID: UUID?,
                       indices: IndexSet, newOffset: Int)
@@ -489,7 +478,7 @@ class ProjectManager: ObservableObject {
         cleanupEmptyLock()
         objectWillChange.send()
     }
-
+    
     // MARK: Exports
     struct ExportData: Codable {
         let projects: [Project]
@@ -527,46 +516,41 @@ class ProjectManager: ObservableObject {
         try? txt.write(to: url, atomically: true, encoding: .utf8)
         return url
     }
-
+    
     // MARK: Display Helpers
     func displayedCurrentProjects() -> [Project] {
         var list: [Project] = []
         list.append(contentsOf: projects.filter { $0.labelID == nil })
-        for label in labels {
-            list.append(contentsOf: projects.filter { $0.labelID == label.id })
+        for lab in labels {
+            list.append(contentsOf:
+                projects.filter { $0.labelID == lab.id })
         }
         return list
     }
     func displayedBackupProjects() -> [Project] {
         var list: [Project] = []
-        list.append(contentsOf: backupProjects.filter { $0.labelID == nil })
-        for label in labels {
-            list.append(contentsOf: backupProjects.filter {
-              $0.labelID == label.id })
+        list.append(contentsOf:
+            backupProjects.filter { $0.labelID == nil })
+        for lab in labels {
+            list.append(contentsOf:
+                backupProjects.filter { $0.labelID == lab.id })
         }
         return list
     }
-
+    
     // MARK: Helpers
     func postCycleNotification() {
         NotificationCenter.default.post(
-          name: Notification.Name("CycleProjectNotification"),
-          object: nil)
+          name: .init("CycleProjectNotification"), object: nil)
     }
     func cleanupEmptyLock() {
-        if let lid = lockedLabelID {
-            let hasCurr = projects.contains { $0.labelID == lid }
-            if !hasCurr {
-                lockedLabelID = nil
-                currentProject = projects.first
-            }
+        if let lid = lockedLabelID,
+           !projects.contains(where: { $0.labelID == lid }) {
+            lockedLabelID = nil
         }
-        if let lid = lockedBackupLabelID {
-            let hasBack = backupProjects.contains { $0.labelID == lid }
-            if !hasBack {
-                lockedBackupLabelID = nil
-                currentProject = projects.first
-            }
+        if let lid = lockedBackupLabelID,
+           !backupProjects.contains(where: { $0.labelID == lid }) {
+            lockedBackupLabelID = nil
         }
     }
 }
@@ -627,7 +611,6 @@ struct LabelAssignmentView: View {
                         }
                     }
                 }
-
                 if closeVisible {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
@@ -780,7 +763,6 @@ struct ProjectRowView: View {
 
         HStack(spacing: 0) {
             Button(action: {
-                // only allow tapping if not disabled
                 guard !( (!isBackupRow &&
                          projectManager.lockedLabelID != nil &&
                          project.labelID != projectManager.lockedLabelID)
@@ -788,7 +770,6 @@ struct ProjectRowView: View {
                            projectManager.lockedBackupLabelID != nil &&
                            project.labelID != projectManager.lockedBackupLabelID)
                 ) else { return }
-
                 withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -884,8 +865,9 @@ struct LabelHeaderView: View {
                 Button(action: {
                     if isBackup {
                         if projectManager.lockedBackupLabelID == label.id {
+                            // manual unlock
                             projectManager.lockedBackupLabelID = nil
-                            projectManager.currentProject = projectManager.projects.first
+                            projectManager.cleanupEmptyLock()
                         } else {
                             projectManager.lockedBackupLabelID = label.id
                             if let first = projectManager.backupProjects.first(where: { $0.labelID == label.id }) {
@@ -894,8 +876,9 @@ struct LabelHeaderView: View {
                         }
                     } else {
                         if projectManager.lockedLabelID == label.id {
+                            // manual unlock
                             projectManager.lockedLabelID = nil
-                            projectManager.currentProject = projectManager.projects.first
+                            projectManager.cleanupEmptyLock()
                         } else {
                             projectManager.lockedLabelID = label.id
                             if let first = projectManager.projects.first(where: { $0.labelID == label.id }) {
@@ -903,15 +886,13 @@ struct LabelHeaderView: View {
                             }
                         }
                     }
-                    projectManager.cleanupEmptyLock()
                 }) {
                     Image(systemName:
                           (isBackup
                            ? (projectManager.lockedBackupLabelID == label.id)
-                           : (projectManager.lockedLabelID       == label.id))
-                          ? "lock.fill" : "lock.open"
-                    )
-                    .foregroundColor(.black)
+                           : (projectManager.lockedLabelID == label.id))
+                          ? "lock.fill" : "lock.open")
+                        .foregroundColor(.black)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .contentShape(Rectangle())
@@ -919,7 +900,8 @@ struct LabelHeaderView: View {
         }
         .padding(.vertical, 8)
         .background(isTargeted ? Color.blue.opacity(0.2) : Color.clear)
-        .onDrop(of: [UTType.text.identifier], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.text.identifier],
+                isTargeted: $isTargeted) { providers in
             providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier,
                                       options: nil) { data, _ in
                 guard let data = data as? Data,
@@ -1820,11 +1802,6 @@ struct ProjectManagerView: View {
             }
             .sheet(isPresented: $showHow, onDismiss: { showHowButton = false }) {
                 ComeFunzionaSheetView { showHow = false }
-            }
-            .onAppear {
-                NotificationCenter.default.addObserver(
-                  forName: Notification.Name("CycleProjectNotification"),
-                  object: nil, queue: .main) { _ in }
             }
         }
     }
