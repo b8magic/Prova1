@@ -11,37 +11,49 @@ extension Color {
         let a, r, g, b: UInt64
         switch hex.count {
         case 3:
-            (a, r, g, b) = (255,
-                            (int >> 8) * 17,
-                            (int >> 4 & 0xF) * 17,
-                            (int & 0xF) * 17)
+            (a, r, g, b) = (
+                255,
+                (int >> 8) * 17,
+                (int >> 4 & 0xF) * 17,
+                (int & 0xF) * 17
+            )
         case 6:
-            (a, r, g, b) = (255,
-                            int >> 16,
-                            int >> 8 & 0xFF,
-                            int & 0xFF)
+            (a, r, g, b) = (
+                255,
+                int >> 16,
+                int >> 8 & 0xFF,
+                int & 0xFF
+            )
         case 8:
-            (a, r, g, b) = (int >> 24,
-                            int >> 16 & 0xFF,
-                            int >> 8 & 0xFF,
-                            int & 0xFF)
+            (a, r, g, b) = (
+                int >> 24,
+                int >> 16 & 0xFF,
+                int >> 8 & 0xFF,
+                int & 0xFF
+            )
         default:
             (a, r, g, b) = (255, 0, 0, 0)
         }
-        self.init(.sRGB,
-                  red:   Double(r)/255,
-                  green: Double(g)/255,
-                  blue:  Double(b)/255,
-                  opacity: Double(a)/255)
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
-
 extension UIColor {
     var toHex: String {
-        var r: CGFloat=0, g: CGFloat=0, b: CGFloat=0, a: CGFloat=0
+        var r: CGFloat = 0,
+            g: CGFloat = 0,
+            b: CGFloat = 0,
+            a: CGFloat = 0
         getRed(&r, green: &g, blue: &b, alpha: &a)
         return String(format: "#%02X%02X%02X",
-                      Int(r*255), Int(g*255), Int(b*255))
+                      Int(r * 255),
+                      Int(g * 255),
+                      Int(b * 255))
     }
 }
 
@@ -54,7 +66,8 @@ enum ActiveAlert: Identifiable {
     case running(newProject: Project, message: String)
     var id: String {
         switch self {
-        case .running(let np, _): return np.id.uuidString
+        case .running(let newProject, _):
+            return newProject.id.uuidString
         }
     }
 }
@@ -66,39 +79,51 @@ struct NoteRow: Identifiable, Codable {
     var orari: String
     var note: String = ""
 
-    enum CodingKeys: String, CodingKey { case id, giorno, orari, note }
+    enum CodingKeys: String, CodingKey {
+        case id, giorno, orari, note
+    }
 
     init(giorno: String, orari: String, note: String = "") {
-        self.giorno = giorno; self.orari = orari; self.note = note
+        self.giorno = giorno
+        self.orari = orari
+        self.note = note
     }
+
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id     = try c.decode(UUID.self, forKey: .id)
+        let c = try decoder
+            .container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
         giorno = try c.decode(String.self, forKey: .giorno)
-        orari  = try c.decode(String.self, forKey: .orari)
-        note   = (try? c.decode(String.self, forKey: .note)) ?? ""
+        orari = try c.decode(String.self, forKey: .orari)
+        note = (try? c.decode(String.self, forKey: .note)) ?? ""
     }
 
     var totalMinutes: Int {
-        orari.split(separator: " ").reduce(0) { sum, seg in
-            let parts = seg.split(separator: "-")
-            guard parts.count == 2,
-                  let s = minutes(from: String(parts[0])),
-                  let e = minutes(from: String(parts[1])) else {
-                return sum
+        orari
+            .split(separator: " ")
+            .reduce(0) { sum, seg in
+                let parts = seg.split(separator: "-")
+                guard parts.count == 2,
+                      let s = minutes(from: String(parts[0])),
+                      let e = minutes(from: String(parts[1])) else {
+                    return sum
+                }
+                return sum + max(0, e - s)
             }
-            return sum + max(0, e - s)
-        }
     }
     var totalTimeString: String {
-        let h = totalMinutes / 60, m = totalMinutes % 60
+        let h = totalMinutes / 60,
+            m = totalMinutes % 60
         return "\(h)h \(m)m"
     }
     private func minutes(from str: String) -> Int? {
         let p = str.split(separator: ":")
         guard p.count == 2,
-              let h = Int(p[0]), let m = Int(p[1]) else { return nil }
-        return h*60 + m
+              let h = Int(p[0]),
+              let m = Int(p[1]) else {
+            return nil
+        }
+        return h * 60 + m
     }
 }
 
@@ -114,39 +139,51 @@ class Project: Identifiable, ObservableObject, Codable {
     @Published var noteRows: [NoteRow]
     var labelID: UUID? = nil
 
-    enum CodingKeys: CodingKey { case id, name, noteRows, labelID }
+    enum CodingKeys: CodingKey {
+        case id, name, noteRows, labelID
+    }
 
     init(name: String) {
         self.name = name
         self.noteRows = []
     }
+
     required init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id       = try c.decode(UUID.self, forKey: .id)
-        name     = try c.decode(String.self, forKey: .name)
-        noteRows = try c.decode([NoteRow].self, forKey: .noteRows)
-        labelID  = try? c.decode(UUID.self, forKey: .labelID)
+        let c = try decoder
+            .container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        noteRows = try c.decode([NoteRow].self,
+                                forKey: .noteRows)
+        labelID = try? c.decode(UUID.self,
+                                forKey: .labelID)
     }
+
     func encode(to e: Encoder) throws {
-        var c = e.container(keyedBy: CodingKeys.self)
-        try c.encode(id,       forKey: .id)
-        try c.encode(name,     forKey: .name)
+        var c = e.container(
+          keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
         try c.encode(noteRows, forKey: .noteRows)
-        try c.encode(labelID,  forKey: .labelID)
+        try c.encode(labelID, forKey: .labelID)
     }
 
     var totalProjectMinutes: Int {
         noteRows.reduce(0) { $0 + $1.totalMinutes }
     }
     var totalProjectTimeString: String {
-        let h = totalProjectMinutes / 60, m = totalProjectMinutes % 60
+        let h = totalProjectMinutes / 60,
+            m = totalProjectMinutes % 60
         return "\(h)h \(m)m"
     }
     func dateFromGiorno(_ s: String) -> Date? {
         let fmt = DateFormatter()
-        fmt.locale     = Locale(identifier: "it_IT")
+        fmt.locale = Locale(identifier: "it_IT")
         fmt.dateFormat = "EEEE dd/MM/yy"
         return fmt.date(from: s)
+    }
+    var isRunning: Bool {
+        noteRows.last?.orari.hasSuffix("-") ?? false
     }
 }
 
@@ -187,8 +224,8 @@ class ProjectManager: ObservableObject {
         }
     }
 
-    let projectsFileName    = "projects.json"
-    let backupOrderFileName = "backupOrder.json"
+    private let projectsFileName    = "projects.json"
+    private let backupOrderFileName = "backupOrder.json"
 
     init() {
         loadProjects()
@@ -196,36 +233,32 @@ class ProjectManager: ObservableObject {
         loadBackupOrder()
         loadLabels()
 
-        if let s = UserDefaults.standard.string(forKey: "lockedLabelID"),
-           let u = UUID(uuidString: s) {
+        if let s = UserDefaults.standard
+          .string(forKey: "lockedLabelID"),
+           let u = UUID(uuidString: s)
+        {
             lockedLabelID = u
         }
-        if let s = UserDefaults.standard.string(
-           forKey: "lockedBackupLabelID"),
+        if let s = UserDefaults.standard
+          .string(forKey: "lockedBackupLabelID"),
            let u = UUID(uuidString: s)
         {
             lockedBackupLabelID = u
         }
 
-        if let lastId = UserDefaults.standard.string(
-           forKey: "lastProjectId"),
-           let uuid = UUID(uuidString: lastId)
+        if let lastId = UserDefaults.standard
+          .string(forKey: "lastProjectId"),
+           let u = UUID(uuidString: lastId)
         {
-            if let p = projects.first(where: { $0.id == uuid }) {
+            if let p = projects.first(where: { $0.id == u }) {
                 currentProject = p
-            } else if let b = backupProjects.first(where: {
-                      $0.id == uuid }) {
+            } else if let b = backupProjects.first(where: { $0.id == u }) {
                 currentProject = b
             } else {
                 currentProject = projects.first
             }
         } else {
             currentProject = projects.first
-        }
-
-        if projects.isEmpty {
-            currentProject = nil
-            saveProjects()
         }
 
         cleanupEmptyLock()
@@ -249,7 +282,9 @@ class ProjectManager: ObservableObject {
         postCycleNotification()
     }
     func deleteProject(project: Project) {
-        if let i = projects.firstIndex(where: { $0.id == project.id }) {
+        if let i = projects.firstIndex(
+           where: { $0.id == project.id })
+        {
             projects.remove(at: i)
             if currentProject?.id == project.id {
                 currentProject = projects.first
@@ -266,7 +301,8 @@ class ProjectManager: ObservableObject {
         let url = getURLForBackup(project: project)
         try? FileManager.default.removeItem(at: url)
         if let i = backupProjects.firstIndex(where: {
-           $0.id == project.id }) {
+           $0.id == project.id })
+        {
             backupProjects.remove(at: i)
             saveBackupOrder()
             saveBackupProjects()
@@ -277,10 +313,11 @@ class ProjectManager: ObservableObject {
     func isProjectRunning(_ project: Project) -> Bool {
         project.noteRows.last?.orari.hasSuffix("-") ?? false
     }
-    func getProjectsFileURL() -> URL {
+    private func getProjectsFileURL() -> URL {
         FileManager.default
-          .urls(for: .documentDirectory, in: .userDomainMask)[0]
-          .appendingPathComponent(projectsFileName)
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent(projectsFileName)
     }
     func saveProjects() {
         do {
@@ -293,18 +330,23 @@ class ProjectManager: ObservableObject {
     func loadProjects() {
         let url = getProjectsFileURL()
         if let d = try? Data(contentsOf: url),
-           let arr = try? JSONDecoder().decode([Project].self,
-                                               from: d) {
+           let arr = try? JSONDecoder()
+             .decode([Project].self, from: d)
+        {
             projects = arr
         }
     }
-    func getURLForBackup(project: Project) -> URL {
+
+    private func getURLForBackup(project: Project) -> URL {
         FileManager.default
-          .urls(for: .documentDirectory, in: .userDomainMask)[0]
-          .appendingPathComponent("\(project.name).json")
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent("\(project.name).json")
     }
     func backupCurrentProjectIfNeeded(
-      _ project: Project, currentDate: Date, currentGiorno: String
+      _ project: Project,
+      currentDate: Date,
+      currentGiorno: String
     ) {
         guard let last = project.noteRows.last,
               last.giorno != currentGiorno,
@@ -316,7 +358,7 @@ class ProjectManager: ObservableObject {
            cal.component(.month, from: currentDate)
         {
             let fmt = DateFormatter()
-            fmt.locale     = Locale(identifier: "it_IT")
+            fmt.locale = Locale(identifier: "it_IT")
             fmt.dateFormat = "LLLL"
             let m = fmt.string(from: d).capitalized
             let y = String(cal.component(.year, from: d) % 100)
@@ -340,18 +382,21 @@ class ProjectManager: ObservableObject {
     func loadBackupProjects() {
         backupProjects = []
         let docs = FileManager.default
-                   .urls(for: .documentDirectory, in: .userDomainMask)[0]
-        if let files = try? FileManager.default.contentsOfDirectory(
-                             at: docs,
-                             includingPropertiesForKeys: nil)
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+        if let files = try?
+          FileManager.default.contentsOfDirectory(
+            at: docs,
+            includingPropertiesForKeys: nil)
         {
             for file in files {
                 if file.lastPathComponent != projectsFileName
                    && file.lastPathComponent != backupOrderFileName
                    && file.pathExtension == "json"
                 {
-                    if let p = try? JSONDecoder().decode(Project.self,
-                                                         from: Data(contentsOf: file))
+                    if let p = try? JSONDecoder()
+                         .decode(Project.self,
+                                 from: Data(contentsOf: file))
                     {
                         backupProjects.append(p)
                     }
@@ -360,31 +405,37 @@ class ProjectManager: ObservableObject {
         }
     }
     func saveBackupOrder() {
-        let order = backupProjects.map { $0.id.uuidString }
+        let order = backupProjects
+            .map { $0.id.uuidString }
         let url = FileManager.default
-                  .urls(for: .documentDirectory, in: .userDomainMask)[0]
-                  .appendingPathComponent(backupOrderFileName)
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent(backupOrderFileName)
         if let d = try? JSONEncoder().encode(order) {
             try? d.write(to: url)
         }
     }
     func loadBackupOrder() {
         let url = FileManager.default
-                  .urls(for: .documentDirectory, in: .userDomainMask)[0]
-                  .appendingPathComponent(backupOrderFileName)
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent(backupOrderFileName)
         if let d = try? Data(contentsOf: url),
-           let order = try? JSONDecoder().decode([String].self,
-                                                 from: d)
+           let order = try? JSONDecoder()
+             .decode([String].self, from: d)
         {
             var ordered: [Project] = []
             for idStr in order {
                 if let uuid = UUID(uuidString: idStr),
-                   let proj = backupProjects.first(where: { $0.id == uuid }) {
+                   let proj = backupProjects
+                     .first(where: { $0.id == uuid })
+                {
                     ordered.append(proj)
                 }
             }
             for p in backupProjects where
-                !ordered.contains(where: { $0.id == p.id }) {
+              !ordered.contains(where: { $0.id == p.id })
+            {
                 ordered.append(p)
             }
             backupProjects = ordered
@@ -392,10 +443,12 @@ class ProjectManager: ObservableObject {
     }
     func saveBackupProjects() {
         let docs = FileManager.default
-                   .urls(for: .documentDirectory, in: .userDomainMask)[0]
-        if let files = try? FileManager.default.contentsOfDirectory(
-                             at: docs,
-                             includingPropertiesForKeys: nil)
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+        if let files = try?
+          FileManager.default.contentsOfDirectory(
+            at: docs,
+            includingPropertiesForKeys: nil)
         {
             for file in files {
                 if file.pathExtension == "json"
@@ -403,13 +456,16 @@ class ProjectManager: ObservableObject {
                    && file.lastPathComponent != "labels.json"
                    && file.lastPathComponent != backupOrderFileName
                 {
-                    try? FileManager.default.removeItem(at: file)
+                    try? FileManager.default
+                        .removeItem(at: file)
                 }
             }
         }
         for p in backupProjects {
             let url = getURLForBackup(project: p)
-            if let d = try? JSONEncoder().encode(p) {
+            if let d = try? JSONEncoder()
+                 .encode(p)
+            {
                 try? d.write(to: url)
             }
         }
@@ -425,7 +481,9 @@ class ProjectManager: ObservableObject {
         postCycleNotification()
     }
     func renameLabel(label: ProjectLabel, newTitle: String) {
-        if let i = labels.firstIndex(where: { $0.id == label.id }) {
+        if let i = labels.firstIndex(
+           where: { $0.id == label.id })
+        {
             labels[i].title = newTitle
             saveLabels()
             cleanupEmptyLock()
@@ -435,8 +493,12 @@ class ProjectManager: ObservableObject {
     }
     func deleteLabel(label: ProjectLabel) {
         labels.removeAll(where: { $0.id == label.id })
-        for p in projects where p.labelID == label.id { p.labelID = nil }
-        for p in backupProjects where p.labelID == label.id { p.labelID = nil }
+        for p in projects where p.labelID == label.id {
+            p.labelID = nil
+        }
+        for p in backupProjects where p.labelID == label.id {
+            p.labelID = nil
+        }
         saveLabels()
         saveProjects()
         saveBackupOrder()
@@ -447,28 +509,34 @@ class ProjectManager: ObservableObject {
     }
     func saveLabels() {
         let url = FileManager.default
-                   .urls(for: .documentDirectory, in: .userDomainMask)[0]
-                   .appendingPathComponent("labels.json")
-        if let d = try? JSONEncoder().encode(labels) {
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent("labels.json")
+        if let d = try? JSONEncoder()
+             .encode(labels)
+        {
             try? d.write(to: url)
         }
     }
     func loadLabels() {
         let url = FileManager.default
-                   .urls(for: .documentDirectory, in: .userDomainMask)[0]
-                   .appendingPathComponent("labels.json")
+            .urls(for: .documentDirectory,
+                  in: .userDomainMask)[0]
+            .appendingPathComponent("labels.json")
         if let d = try? Data(contentsOf: url),
-           let arr = try? JSONDecoder().decode([ProjectLabel].self,
-                                                from: d)
+           let arr = try? JSONDecoder()
+             .decode([ProjectLabel].self, from: d)
         {
             labels = arr
         }
     }
 
     // MARK: Reordering
-    func moveProjects(forLabel labelID: UUID?,
-                      indices: IndexSet, newOffset: Int)
-    {
+    func moveProjects(
+      forLabel labelID: UUID?,
+      indices: IndexSet,
+      newOffset: Int
+    ) {
         var g = projects.filter { $0.labelID == labelID }
         g.move(fromOffsets: indices, toOffset: newOffset)
         projects.removeAll { $0.labelID == labelID }
@@ -477,10 +545,14 @@ class ProjectManager: ObservableObject {
         cleanupEmptyLock()
         objectWillChange.send()
     }
-    func moveBackupProjects(forLabel labelID: UUID?,
-                            indices: IndexSet, newOffset: Int)
-    {
-        var g = backupProjects.filter { $0.labelID == labelID }
+    func moveBackupProjects(
+      forLabel labelID: UUID?,
+      indices: IndexSet,
+      newOffset: Int
+    ) {
+        var g = backupProjects.filter {
+            $0.labelID == labelID
+        }
         g.move(fromOffsets: indices, toOffset: newOffset)
         backupProjects.removeAll { $0.labelID == labelID }
         backupProjects.append(contentsOf: g)
@@ -490,7 +562,7 @@ class ProjectManager: ObservableObject {
         objectWillChange.send()
     }
 
-    // MARK: Exports
+    // MARK: Export
     struct ExportData: Codable {
         let projects: [Project]
         let backupProjects: [Project]
@@ -500,22 +572,26 @@ class ProjectManager: ObservableObject {
     }
     func getExportURL() -> URL? {
         let d = ExportData(
-          projects: projects,
-          backupProjects: backupProjects,
-          labels: labels,
-          lockedLabelID: lockedLabelID?.uuidString,
-          lockedBackupLabelID: lockedBackupLabelID?.uuidString)
+            projects: projects,
+            backupProjects: backupProjects,
+            labels: labels,
+            lockedLabelID: lockedLabelID?.uuidString,
+            lockedBackupLabelID:
+              lockedBackupLabelID?.uuidString
+        )
         if let data = try? JSONEncoder().encode(d) {
-            let url = FileManager.default.temporaryDirectory
-                      .appendingPathComponent("MonteOreExport.json")
+            let url = FileManager.default
+                .temporaryDirectory
+                .appendingPathComponent("MonteOreExport.json")
             try? data.write(to: url)
             return url
         }
         return nil
     }
     func getCSVExportURL() -> URL? {
-        let url = FileManager.default.temporaryDirectory
-                  .appendingPathComponent("MonteOreExport.txt")
+        let url = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent("MonteOreExport.txt")
         var txt = ""
         for p in projects {
             txt += "\"\(p.name)\",\"\(p.totalProjectTimeString)\"\n"
@@ -524,25 +600,30 @@ class ProjectManager: ObservableObject {
             }
             txt += "\n"
         }
-        try? txt.write(to: url, atomically: true, encoding: .utf8)
+        try? txt.write(to: url, atomically: true,
+                       encoding: .utf8)
         return url
     }
 
     // MARK: Display Helpers
     func displayedCurrentProjects() -> [Project] {
         var list: [Project] = []
-        list.append(contentsOf: projects.filter { $0.labelID == nil })
-        for label in labels {
-            list.append(contentsOf: projects.filter { $0.labelID == label.id })
+        list.append(contentsOf:
+            projects.filter { $0.labelID == nil })
+        for lab in labels {
+            list.append(contentsOf:
+              projects.filter { $0.labelID == lab.id })
         }
         return list
     }
     func displayedBackupProjects() -> [Project] {
         var list: [Project] = []
-        list.append(contentsOf: backupProjects.filter { $0.labelID == nil })
-        for label in labels {
-            list.append(contentsOf: backupProjects.filter {
-              $0.labelID == label.id })
+        list.append(contentsOf:
+            backupProjects.filter { $0.labelID == nil })
+        for lab in labels {
+            list.append(contentsOf:
+              backupProjects.filter {
+                $0.labelID == lab.id })
         }
         return list
     }
@@ -551,20 +632,23 @@ class ProjectManager: ObservableObject {
     func postCycleNotification() {
         NotificationCenter.default.post(
           name: Notification.Name("CycleProjectNotification"),
-          object: nil)
+          object: nil
+        )
     }
     func cleanupEmptyLock() {
-        // current lock
         if let lid = lockedLabelID {
-            let hasCurr = projects.contains { $0.labelID == lid }
+            let hasCurr = projects.contains {
+                $0.labelID == lid
+            }
             if !hasCurr {
                 lockedLabelID = nil
                 currentProject = projects.first
             }
         }
-        // backup lock
         if let lid = lockedBackupLabelID {
-            let hasBack = backupProjects.contains { $0.labelID == lid }
+            let hasBack = backupProjects.contains {
+                $0.labelID == lid
+            }
             if !hasBack {
                 lockedBackupLabelID = nil
                 currentProject = projects.first
@@ -577,16 +661,19 @@ class ProjectManager: ObservableObject {
 struct ActivityView: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
+
     func makeUIViewController(
-      context: Context) -> UIActivityViewController
-    {
+      context: Context
+    ) -> UIActivityViewController {
         UIActivityViewController(
           activityItems: activityItems,
-          applicationActivities: applicationActivities)
+          applicationActivities: applicationActivities
+        )
     }
     func updateUIViewController(
       _ vc: UIActivityViewController,
-      context: Context) {}
+      context: Context
+    ) {}
 }
 
 // MARK: - LabelAssignmentView
@@ -600,25 +687,27 @@ struct LabelAssignmentView: View {
         NavigationView {
             VStack {
                 List {
-                    ForEach(projectManager.labels) { label in
+                    ForEach(projectManager.labels) { lab in
                         HStack {
                             Circle()
-                                .fill(Color(hex: label.color))
+                                .fill(Color(hex: lab.color))
                                 .frame(width: 20, height: 20)
-                            Text(label.title)
+                            Text(lab.title)
                             Spacer()
-                            if project.labelID == label.id {
+                            if project.labelID == lab.id {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.blue)
                             }
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            project.labelID = (project.labelID == label.id
-                                               ? nil : label.id)
-                            closeVisible = (project.labelID != nil)
-                            if projectManager.backupProjects.contains(
-                               where: { $0.id == project.id }) {
+                            project.labelID =
+                              (project.labelID == lab.id
+                                ? nil : lab.id)
+                            closeVisible = project.labelID != nil
+                            if projectManager.backupProjects
+                              .contains(where: { $0.id == project.id })
+                            {
                                 projectManager.saveBackupProjects()
                                 projectManager.saveBackupOrder()
                             } else {
@@ -629,7 +718,6 @@ struct LabelAssignmentView: View {
                         }
                     }
                 }
-
                 if closeVisible {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
@@ -683,19 +771,20 @@ struct CombinedProjectEditSheet: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding(.horizontal)
                 Button(action: {
-                    let oldName = project.name
-                    if projectManager.backupProjects.contains(where: {
-                       $0.id == project.id }) {
+                    let old = project.name
+                    if projectManager.backupProjects
+                      .contains(where: { $0.id == project.id })
+                    {
                         let docs = FileManager.default
-                                    .urls(for: .documentDirectory,
-                                          in: .userDomainMask)[0]
-                        let oldURL = docs.appendingPathComponent(
-                                     "\(oldName).json")
+                          .urls(for: .documentDirectory,
+                                in: .userDomainMask)[0]
+                        let oldURL = docs
+                          .appendingPathComponent("\(old).json")
                         project.name = newName
-                        let newURL = docs.appendingPathComponent(
-                                     "\(project.name).json")
-                        try? FileManager.default.moveItem(
-                          at: oldURL, to: newURL)
+                        let newURL = docs
+                          .appendingPathComponent("\(project.name).json")
+                        try? FileManager.default
+                          .moveItem(at: oldURL, to: newURL)
                         projectManager.saveBackupOrder()
                         projectManager.saveBackupProjects()
                     } else {
@@ -736,11 +825,14 @@ struct CombinedProjectEditSheet: View {
                       title: Text("Elimina progetto"),
                       message: Text("Sei sicuro di voler eliminare \(project.name)?"),
                       primaryButton: .destructive(Text("Elimina")) {
-                          if projectManager.backupProjects.contains(where: {
-                             $0.id == project.id }) {
-                              projectManager.deleteBackupProject(project: project)
+                          if projectManager.backupProjects
+                            .contains(where: { $0.id == project.id })
+                          {
+                              projectManager.deleteBackupProject(
+                                project: project)
                           } else {
-                              projectManager.deleteProject(project: project)
+                              projectManager.deleteProject(
+                                project: project)
                           }
                           presentationMode.wrappedValue.dismiss()
                       },
@@ -774,15 +866,25 @@ struct ProjectRowView: View {
     var editingProjects: Bool
 
     @State private var isHighlighted = false
-    @State private var showSheet      = false
+    @State private var showSheet = false
+
+    private var isBackup: Bool {
+        projectManager.backupProjects
+          .contains(where: { $0.id == project.id })
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             Button(action: {
-                guard projectManager.lockedLabelID == nil ||
-                      project.labelID == projectManager.lockedLabelID else { return }
-                withAnimation(.easeIn(duration: 0.2)) { isHighlighted = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // only disable in current section when locked
+                guard projectManager.lockedLabelID == nil
+                  || project.labelID == projectManager.lockedLabelID
+                else { return }
+                withAnimation(.easeIn(duration: 0.2)) {
+                    isHighlighted = true
+                }
+                DispatchQueue.main.asyncAfter(deadline:
+                  .now() + 0.2) {
                     withAnimation(.easeOut(duration: 0.2)) {
                         isHighlighted = false
                     }
@@ -799,8 +901,9 @@ struct ProjectRowView: View {
                 .padding(.horizontal, 10)
             }
             .disabled(
-                projectManager.lockedLabelID != nil &&
-                project.labelID != projectManager.lockedLabelID
+                !isBackup
+                && projectManager.lockedLabelID != nil
+                && project.labelID != projectManager.lockedLabelID
             )
             .buttonStyle(PlainButtonStyle())
             .contentShape(Rectangle())
@@ -808,7 +911,9 @@ struct ProjectRowView: View {
             Divider().frame(width: 1).background(Color.gray)
 
             Button(action: { showSheet = true }) {
-                Text(editingProjects ? "Rinomina o Elimina" : "Etichetta")
+                Text(editingProjects
+                     ? "Rinomina o Elimina"
+                     : "Etichetta")
                     .font(.footnote)
                     .foregroundColor(.blue)
                     .padding(.horizontal, 8)
@@ -817,23 +922,29 @@ struct ProjectRowView: View {
             .contentShape(Rectangle())
         }
         .background(
-            projectManager.isProjectRunning(project)
+            project.isRunning
             ? Color.yellow
-            : (isHighlighted ? Color.gray.opacity(0.3) : Color.clear)
+            : (isHighlighted
+               ? Color.gray.opacity(0.3)
+               : Color.clear)
         )
         .sheet(isPresented: $showSheet) {
             if editingProjects {
                 CombinedProjectEditSheet(
                   project: project,
-                  projectManager: projectManager)
+                  projectManager: projectManager
+                )
             } else {
                 LabelAssignmentView(
                   project: project,
-                  projectManager: projectManager)
+                  projectManager: projectManager
+                )
             }
         }
         .onDrag {
-            NSItemProvider(object: project.id.uuidString as NSString)
+            NSItemProvider(
+              object: project.id.uuidString as NSString
+            )
         }
     }
 }
@@ -857,19 +968,27 @@ struct LabelHeaderView: View {
                 .foregroundColor(Color(hex: label.color))
             Spacer()
 
+            // only show lock if this label has projects in this section
             let hasInSection = isBackup
-                ? projectManager.backupProjects.contains(where: { $0.labelID == label.id })
-                : projectManager.projects.contains(where: { $0.labelID == label.id })
+                ? projectManager.backupProjects.contains {
+                    $0.labelID == label.id
+                }
+                : projectManager.projects.contains {
+                    $0.labelID == label.id
+                }
 
             if hasInSection {
                 Button(action: {
                     if isBackup {
                         if projectManager.lockedBackupLabelID == label.id {
                             projectManager.lockedBackupLabelID = nil
+                            // return to first unlocked project
                             projectManager.currentProject = projectManager.projects.first
                         } else {
                             projectManager.lockedBackupLabelID = label.id
-                            if let first = projectManager.backupProjects.first(where: { $0.labelID == label.id }) {
+                            if let first = projectManager.backupProjects
+                                .first(where: { $0.labelID == label.id })
+                            {
                                 projectManager.currentProject = first
                             }
                         }
@@ -879,7 +998,9 @@ struct LabelHeaderView: View {
                             projectManager.currentProject = projectManager.projects.first
                         } else {
                             projectManager.lockedLabelID = label.id
-                            if let first = projectManager.projects.first(where: { $0.labelID == label.id }) {
+                            if let first = projectManager.projects
+                                .first(where: { $0.labelID == label.id })
+                            {
                                 projectManager.currentProject = first
                             }
                         }
@@ -889,7 +1010,7 @@ struct LabelHeaderView: View {
                     Image(systemName:
                           (isBackup
                            ? (projectManager.lockedBackupLabelID == label.id)
-                           : (projectManager.lockedLabelID       == label.id))
+                           : (projectManager.lockedLabelID == label.id))
                           ? "lock.fill" : "lock.open"
                     )
                     .foregroundColor(.black)
@@ -900,22 +1021,31 @@ struct LabelHeaderView: View {
         }
         .padding(.vertical, 8)
         .background(isTargeted ? Color.blue.opacity(0.2) : Color.clear)
-        .onDrop(of: [UTType.text.identifier], isTargeted: $isTargeted) { providers in
-            providers.first?.loadItem(forTypeIdentifier: UTType.text.identifier,
-                                      options: nil) { data, _ in
+        .onDrop(of: [UTType.text.identifier],
+                isTargeted: $isTargeted)
+        { providers in
+            providers.first?.loadItem(
+                forTypeIdentifier: UTType.text.identifier,
+                options: nil)
+            { data, _ in
                 guard let data = data as? Data,
-                      let str = String(data: data, encoding: .utf8),
+                      let str = String(data: data,
+                                       encoding: .utf8),
                       let uuid = UUID(uuidString: str)
                 else { return }
                 DispatchQueue.main.async {
                     if isBackup {
-                        if let i = projectManager.backupProjects.firstIndex(where: { $0.id == uuid }) {
+                        if let i = projectManager.backupProjects
+                               .firstIndex(where: { $0.id == uuid })
+                        {
                             projectManager.backupProjects[i].labelID = label.id
                             projectManager.saveBackupProjects()
                             projectManager.saveBackupOrder()
                         }
                     } else {
-                        if let i = projectManager.projects.firstIndex(where: { $0.id == uuid }) {
+                        if let i = projectManager.projects
+                               .firstIndex(where: { $0.id == uuid })
+                        {
                             projectManager.projects[i].labelID = label.id
                             projectManager.saveProjects()
                             projectManager.cleanupEmptyLock()
@@ -928,20 +1058,19 @@ struct LabelHeaderView: View {
     }
 }
 
-// MARK: - LabelsManagerView
+// MARK: - LabelsManagerView and Sheets
 enum LabelActionType: Identifiable {
     case rename(label: ProjectLabel, initialText: String)
     case delete(label: ProjectLabel)
     case changeColor(label: ProjectLabel)
     var id: UUID {
         switch self {
-        case .rename(let l, _):  return l.id
-        case .delete(let l):     return l.id
-        case .changeColor(let l):return l.id
+        case .rename(let l, _): return l.id
+        case .delete(let l): return l.id
+        case .changeColor(let l): return l.id
         }
     }
 }
-
 struct LabelsManagerView: View {
     @ObservedObject var projectManager: ProjectManager
     @Environment(\.presentationMode) var presentationMode
@@ -954,29 +1083,31 @@ struct LabelsManagerView: View {
         NavigationView {
             VStack {
                 List {
-                    ForEach(projectManager.labels) { label in
+                    ForEach(projectManager.labels) { lab in
                         HStack(spacing: 12) {
                             Button(action: {
-                                activeAction = .changeColor(label: label)
+                                activeAction = .changeColor(label: lab)
                             }) {
                                 Circle()
-                                    .fill(Color(hex: label.color))
+                                    .fill(Color(hex: lab.color))
                                     .frame(width: 30, height: 30)
                             }
                             .buttonStyle(PlainButtonStyle())
                             .contentShape(Rectangle())
 
-                            Text(label.title)
+                            Text(lab.title)
                             Spacer()
                             Button("Rinomina") {
-                                activeAction = .rename(label: label,
-                                                       initialText: label.title)
+                                activeAction = .rename(
+                                  label: lab,
+                                  initialText: lab.title
+                                )
                             }
                             .foregroundColor(.blue)
                             .buttonStyle(BorderlessButtonStyle())
                             .contentShape(Rectangle())
                             Button("Elimina") {
-                                activeAction = .delete(label: label)
+                                activeAction = .delete(label: lab)
                             }
                             .foregroundColor(.red)
                             .buttonStyle(BorderlessButtonStyle())
@@ -984,15 +1115,18 @@ struct LabelsManagerView: View {
                         }
                     }
                     .onMove { idx, off in
-                        projectManager.labels.move(fromOffsets: idx,
-                                                   toOffset: off)
+                        projectManager.labels.move(
+                          fromOffsets: idx,
+                          toOffset: off
+                        )
                         projectManager.saveLabels()
                     }
                 }
                 .listStyle(PlainListStyle())
 
                 HStack {
-                    TextField("Nuova etichetta", text: $newLabelTitle)
+                    TextField("Nuova etichetta",
+                              text: $newLabelTitle)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     ColorPicker("", selection: $newLabelColor,
                                 supportsOpacity: false)
@@ -1002,7 +1136,8 @@ struct LabelsManagerView: View {
                         guard !newLabelTitle.isEmpty else { return }
                         projectManager.addLabel(
                           title: newLabelTitle,
-                          color: UIColor(newLabelColor).toHex)
+                          color: UIColor(newLabelColor).toHex
+                        )
                         newLabelTitle = ""
                         newLabelColor = .black
                     }
@@ -1010,20 +1145,23 @@ struct LabelsManagerView: View {
                     .padding(8)
                     .overlay(
                       RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.green, lineWidth: 2))
+                        .stroke(Color.green, lineWidth: 2)
+                    )
                     .contentShape(Rectangle())
                 }
                 .padding()
             }
             .navigationTitle("Etichette")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement:
+                              .cancellationAction) {
                     Button("Chiudi") {
                         presentationMode.wrappedValue.dismiss()
                     }
                     .contentShape(Rectangle())
                 }
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement:
+                              .primaryAction) {
                     Button(isEditingLabels ? "Fatto" : "Ordina") {
                         isEditingLabels.toggle()
                     }
@@ -1033,45 +1171,48 @@ struct LabelsManagerView: View {
                 }
             }
             .environment(\.editMode,
-                         .constant(isEditingLabels ? .active : .inactive))
+                         .constant(
+                           isEditingLabels
+                           ? EditMode.active
+                           : EditMode.inactive
+                         ))
             .sheet(item: $activeAction) { action in
                 switch action {
                 case .rename(let l, let txt):
-                    RenameLabelSheetWrapper(projectManager: projectManager,
-                                            label: l,
-                                            initialText: txt) {
-                        activeAction = nil
-                    }
+                    RenameLabelSheetWrapper(
+                      projectManager: projectManager,
+                      label: l,
+                      initialText: txt
+                    ) { activeAction = nil }
                 case .delete(let l):
-                    DeleteLabelSheetWrapper(projectManager: projectManager,
-                                            label: l) {
-                        activeAction = nil
-                    }
+                    DeleteLabelSheetWrapper(
+                      projectManager: projectManager,
+                      label: l
+                    ) { activeAction = nil }
                 case .changeColor(let l):
-                    ChangeLabelColorDirectSheet(projectManager: projectManager,
-                                                label: l) {
-                        activeAction = nil
-                    }
+                    ChangeLabelColorDirectSheet(
+                      projectManager: projectManager,
+                      label: l
+                    ) { activeAction = nil }
                 }
             }
         }
     }
 }
 
-// MARK: - Rename / Delete / Color Sheets
 struct RenameLabelSheetWrapper: View {
     @ObservedObject var projectManager: ProjectManager
     @State var label: ProjectLabel
     @State var newName: String
-    var onDismiss: ()->Void
+    var onDismiss: () -> Void
 
     init(projectManager: ProjectManager,
          label: ProjectLabel,
          initialText: String,
-         onDismiss: @escaping ()->Void)
+         onDismiss: @escaping () -> Void)
     {
         self.projectManager = projectManager
-        _label   = State(initialValue: label)
+        _label = State(initialValue: label)
         _newName = State(initialValue: initialText)
         self.onDismiss = onDismiss
     }
@@ -1083,8 +1224,10 @@ struct RenameLabelSheetWrapper: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding()
             Button(action: {
-                projectManager.renameLabel(label: label,
-                                           newTitle: newName)
+                projectManager.renameLabel(
+                  label: label,
+                  newTitle: newName
+                )
                 onDismiss()
             }) {
                 Text("Conferma")
@@ -1104,12 +1247,12 @@ struct RenameLabelSheetWrapper: View {
 struct DeleteLabelSheetWrapper: View {
     @ObservedObject var projectManager: ProjectManager
     var label: ProjectLabel
-    var onDismiss: ()->Void
+    var onDismiss: () -> Void
 
     var body: some View {
         VStack(spacing: 20) {
             Text("Elimina Etichetta").font(.title).bold()
-            Text("Sei sicuro di voler eliminare l'etichetta \(label.title)?")
+            Text("Sei sicuro di voler eliminare \(label.title)?")
                 .multilineTextAlignment(.center)
                 .padding()
             Button(action: {
@@ -1144,15 +1287,16 @@ struct ChangeLabelColorDirectSheet: View {
     @ObservedObject var projectManager: ProjectManager
     @State var label: ProjectLabel
     @State var selectedColor: Color
-    var onDismiss: ()->Void
+    var onDismiss: () -> Void
 
     init(projectManager: ProjectManager,
          label: ProjectLabel,
-         onDismiss: @escaping ()->Void)
+         onDismiss: @escaping () -> Void)
     {
         self.projectManager = projectManager
-        _label         = State(initialValue: label)
-        _selectedColor = State(initialValue: Color(hex: label.color))
+        _label = State(initialValue: label)
+        _selectedColor = State(initialValue:
+                                  Color(hex: label.color))
         self.onDismiss = onDismiss
     }
 
@@ -1168,8 +1312,11 @@ struct ChangeLabelColorDirectSheet: View {
                 .labelsHidden()
                 .padding()
             Button(action: {
-                if let i = projectManager.labels.firstIndex(where: {
-                   $0.id == label.id }) {
+                if let i = projectManager.labels
+                    .firstIndex(where: {
+                      $0.id == label.id
+                    })
+                {
                     projectManager.labels[i].color =
                       UIColor(selectedColor).toHex
                     projectManager.saveLabels()
@@ -1210,8 +1357,9 @@ struct NoteView: View {
 
     private var projectNameColor: Color {
         if let lid = project.labelID,
-           let hex = projectManager.labels.first(where: {
-             $0.id == lid })?.color {
+           let hex = projectManager.labels
+             .first(where: { $0.id == lid })?.color
+        {
             return Color(hex: hex)
         }
         return .black
@@ -1219,18 +1367,15 @@ struct NoteView: View {
 
     var body: some View {
         ZStack {
-            if projectManager.isProjectRunning(project) {
-                Color.yellow
-            } else {
-                Color.white.opacity(0.2)
-            }
+            (project.isRunning ? Color.yellow : Color.white.opacity(0.2))
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         if let lid = project.labelID,
-                           let lab = projectManager.labels.first(where: {
-                             $0.id == lid }) {
+                           let lab = projectManager.labels
+                             .first(where: { $0.id == lid })
+                        {
                             HStack(spacing: 8) {
                                 Text(lab.title)
                                     .font(.headline)
@@ -1239,16 +1384,20 @@ struct NoteView: View {
                                     .fill(Color(hex: lab.color))
                                     .frame(width: 24, height: 24)
                                     .overlay(
-                                      Circle().stroke(Color.black,
-                                                      lineWidth: 1))
+                                      Circle()
+                                        .stroke(Color.black,
+                                                lineWidth: 1)
+                                    )
                             }
                             .foregroundColor(.black)
                         }
+
                         Text(project.name)
                             .font(.title3)
                             .bold()
                             .underline(true, color: projectNameColor)
                             .foregroundColor(.black)
+
                         Text("Tot Monte Ore: \(project.totalProjectTimeString)")
                             .font(.body)
                             .bold()
@@ -1256,30 +1405,33 @@ struct NoteView: View {
                     Spacer()
                     if editMode {
                         VStack {
-                            Button(action: {
+                            Button("Salva") {
+                                // remove entirely empty rows:
                                 var rows = editedRows.filter {
                                     !(
                                       $0.giorno.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
+                                              .whitespaces).isEmpty
                                       && $0.orari.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
+                                              .whitespaces).isEmpty
                                       && $0.note.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
+                                              .whitespaces).isEmpty
                                     )
                                 }
+                                // sort by date:
                                 rows.sort {
-                                    guard let d1 =
-                                      project.dateFromGiorno($0.giorno),
-                                          let d2 =
-                                      project.dateFromGiorno($1.giorno)
+                                    guard
+                                      let d1 = project.dateFromGiorno($0.giorno),
+                                      let d2 = project.dateFromGiorno($1.giorno)
                                     else {
                                         return $0.giorno < $1.giorno
                                     }
                                     return d1 < d2
                                 }
                                 project.noteRows = rows
-                                if projectManager.backupProjects.contains(
-                                   where: { $0.id == project.id }) {
+                                if projectManager.backupProjects
+                                  .contains(where: {
+                                    $0.id == project.id })
+                                {
                                     projectManager.saveBackupProjects()
                                     projectManager.saveBackupOrder()
                                 } else {
@@ -1287,28 +1439,21 @@ struct NoteView: View {
                                 }
                                 projectManager.objectWillChange.send()
                                 editMode = false
-                            }) {
-                                Text("Salva").foregroundColor(.blue)
                             }
-                            .contentShape(Rectangle())
-                            Button(action: {
+                            .foregroundColor(.blue)
+                            Button("Annulla") {
                                 editMode = false
-                            }) {
-                                Text("Annulla").foregroundColor(.red)
                             }
-                            .contentShape(Rectangle())
+                            .foregroundColor(.red)
                         }
                         .font(.body)
                     } else {
-                        Button(action: {
+                        Button("Modifica") {
                             editedRows = project.noteRows
                             editMode = true
-                        }) {
-                            Text("Modifica")
-                                .font(.body)
-                                .foregroundColor(.blue)
                         }
-                        .contentShape(Rectangle())
+                        .font(.body)
+                        .foregroundColor(.blue)
                     }
                 }
                 .padding(.bottom, 5)
@@ -1319,7 +1464,10 @@ struct NoteView: View {
                             Spacer()
                             Button(action: {
                                 editedRows.append(
-                                  NoteRow(giorno: "", orari: "", note: ""))
+                                  NoteRow(giorno: "",
+                                          orari: "",
+                                          note: "")
+                                )
                             }) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title)
@@ -1330,22 +1478,27 @@ struct NoteView: View {
                             VStack(spacing: 8) {
                                 ForEach($editedRows) { $row in
                                     HStack(spacing: 8) {
-                                        TextField("Giorno", text: $row.giorno)
+                                        TextField("Giorno",
+                                                  text: $row.giorno)
                                             .font(.system(size: 14))
                                             .frame(height: 60)
-                                        Divider().frame(height: 60)
+                                        Divider()
+                                            .frame(height: 60)
                                             .background(Color.black)
                                         TextEditor(text: $row.orari)
                                             .font(.system(size: 14))
                                             .frame(height: 60)
-                                        Divider().frame(height: 60)
+                                        Divider()
+                                            .frame(height: 60)
                                             .background(Color.black)
                                         Text(row.totalTimeString)
                                             .font(.system(size: 14))
                                             .frame(height: 60)
-                                        Divider().frame(height: 60)
+                                        Divider()
+                                            .frame(height: 60)
                                             .background(Color.black)
-                                        TextField("Note", text: $row.note)
+                                        TextField("Note",
+                                                  text: $row.note)
                                             .font(.system(size: 14))
                                             .frame(height: 60)
                                     }
@@ -1357,23 +1510,27 @@ struct NoteView: View {
                     }
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading,
+                               spacing: 8) {
                             ForEach(project.noteRows) { row in
                                 HStack(spacing: 8) {
                                     Text(row.giorno)
                                         .font(.system(size: 14))
                                         .frame(minHeight: 60)
-                                    Divider().frame(height: 60)
+                                    Divider()
+                                        .frame(height: 60)
                                         .background(Color.black)
                                     Text(row.orari)
                                         .font(.system(size: 14))
                                         .frame(minHeight: 60)
-                                    Divider().frame(height: 60)
+                                    Divider()
+                                        .frame(height: 60)
                                         .background(Color.black)
                                     Text(row.totalTimeString)
                                         .font(.system(size: 14))
                                         .frame(minHeight: 60)
-                                    Divider().frame(height: 60)
+                                    Divider()
+                                        .frame(height: 60)
                                         .background(Color.black)
                                     Text(row.note)
                                         .font(.system(size: 14))
@@ -1395,7 +1552,7 @@ struct NoteView: View {
 
 // MARK: - ComeFunzionaSheetView
 struct ComeFunzionaSheetView: View {
-    var onDismiss: ()->Void
+    var onDismiss: () -> Void
 
     var body: some View {
         ScrollView {
@@ -1406,7 +1563,8 @@ struct ComeFunzionaSheetView: View {
                     .padding(.bottom)
 
                 Group {
-                    Text("🔹 Panoramica Generale").font(.headline)
+                    Text("🔹 Panoramica Generale")
+                        .font(.headline)
                     Text("""
                     MonteOre è un tracker di tempo semplice e potente:
                     • Avvia/ferma il timer col grande pulsante nero.
@@ -1416,7 +1574,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Progetti e Backup Mensili").font(.headline)
+                    Text("🔹 Progetti e Backup Mensili")
+                        .font(.headline)
                     Text("""
                     • Nella sezione “Gestione Progetti” trovi i progetti attivi e i backup mensili.
                     • Puoi rinominare, eliminare e riordinare entrambi i gruppi.
@@ -1426,7 +1585,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Etichette").font(.headline)
+                    Text("🔹 Etichette")
+                        .font(.headline)
                     Text("""
                     • Usa le etichette per raggruppare progetti per categoria.
                     • Assegna o cambia etichetta cliccando su “Etichetta”.
@@ -1436,7 +1596,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Navigazione Progetti").font(.headline)
+                    Text("🔹 Navigazione Progetti")
+                        .font(.headline)
                     Text("""
                     • Il pulsante giallo con frecce cicla avanti/indietro tra i progetti ordinati.
                     • Se stai visualizzando un backup, appare al centro il pulsante blu “Torna ai progetti correnti”.
@@ -1445,7 +1606,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Import/Export").font(.headline)
+                    Text("🔹 Import/Export")
+                        .font(.headline)
                     Text("""
                     • “Condividi Monte Ore” ti permette di esportare in JSON o CSV.
                     • Importa un backup via JSON: tutti i dati correnti vengono sovrascritti.
@@ -1454,7 +1616,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Modifica Note e Righe").font(.headline)
+                    Text("🔹 Modifica Note e Righe")
+                        .font(.headline)
                     Text("""
                     • Clicca “Modifica” nella vista del progetto per cambiare le righe.
                     • Aggiungi righe vuote con il +, elimina righe totalmente vuote su Salva.
@@ -1463,7 +1626,8 @@ struct ComeFunzionaSheetView: View {
                 }
 
                 Group {
-                    Text("🔹 Buone Pratiche").font(.headline)
+                    Text("🔹 Buone Pratiche")
+                        .font(.headline)
                     Text("""
                     • Denomina i progetti in modo conciso, es. “Excel”, e usa le etichette per il contesto.
                     • Aggiungi l’emoji ✅ nelle note per marcare ore già registrate altrove.
@@ -1477,7 +1641,7 @@ struct ComeFunzionaSheetView: View {
         .cornerRadius(12)
         .padding()
         .overlay(
-            Button(action: { onDismiss() }) {
+            Button(action: onDismiss) {
                 Text("Chiudi")
                     .font(.title2)
                     .foregroundColor(.white)
@@ -1496,6 +1660,8 @@ struct ComeFunzionaSheetView: View {
 // MARK: - ProjectManagerView
 struct ProjectManagerView: View {
     @ObservedObject var projectManager: ProjectManager
+
+    @Environment(\.presentationMode) var presentationMode
 
     @State private var newProjectName = ""
     @State private var showEtichette = false
@@ -1521,17 +1687,19 @@ struct ProjectManagerView: View {
                 List {
                     Section(header:
                         Text("Progetti Correnti")
-                            .font(.largeTitle).bold()
+                            .font(.largeTitle)
+                            .bold()
                             .padding(.top, 10)
                     ) {
-                        let unl = projectManager.projects.filter {
-                            $0.labelID == nil }
+                        let unl = projectManager.projects
+                           .filter { $0.labelID == nil }
                         if !unl.isEmpty {
                             ForEach(unl) { p in
                                 ProjectRowView(
                                   project: p,
                                   projectManager: projectManager,
-                                  editingProjects: editingProjects)
+                                  editingProjects: editingProjects
+                                )
                             }
                             .onMove { idx, off in
                                 projectManager.moveProjects(
@@ -1541,11 +1709,10 @@ struct ProjectManagerView: View {
                             }
                         }
                         ForEach(projectManager.labels) { lab in
-                            LabelHeaderView(
-                              label: lab,
-                              projectManager: projectManager)
-                            let grp = projectManager.projects.filter {
-                                $0.labelID == lab.id }
+                            LabelHeaderView(label: lab,
+                                            projectManager: projectManager)
+                            let grp = projectManager.projects
+                                .filter { $0.labelID == lab.id }
                             if !grp.isEmpty {
                                 ForEach(grp) { p in
                                     ProjectRowView(
@@ -1565,11 +1732,12 @@ struct ProjectManagerView: View {
 
                     Section(header:
                         Text("Mensilità Passate")
-                            .font(.largeTitle).bold()
+                            .font(.largeTitle)
+                            .bold()
                             .padding(.top, 40)
                     ) {
-                        let unl = projectManager.backupProjects.filter {
-                            $0.labelID == nil }
+                        let unl = projectManager.backupProjects
+                            .filter { $0.labelID == nil }
                         if !unl.isEmpty {
                             ForEach(unl) { p in
                                 ProjectRowView(
@@ -1585,13 +1753,12 @@ struct ProjectManagerView: View {
                             }
                         }
                         ForEach(projectManager.labels) { lab in
-                            let grp = projectManager.backupProjects.filter {
-                                $0.labelID == lab.id }
+                            let grp = projectManager.backupProjects
+                                .filter { $0.labelID == lab.id }
                             if !grp.isEmpty {
-                                LabelHeaderView(
-                                  label: lab,
-                                  projectManager: projectManager,
-                                  isBackup: true)
+                                LabelHeaderView(label: lab,
+                                                projectManager: projectManager,
+                                                isBackup: true)
                                 ForEach(grp) { p in
                                     ProjectRowView(
                                       project: p,
@@ -1617,7 +1784,8 @@ struct ProjectManagerView: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     Button(action: {
                         guard !newProjectName.isEmpty else { return }
-                        projectManager.addProject(name: newProjectName)
+                        projectManager.addProject(
+                          name: newProjectName)
                         newProjectName = ""
                     }) {
                         Text("Crea")
@@ -1630,7 +1798,6 @@ struct ProjectManagerView: View {
                             )
                     }
                     .contentShape(Rectangle())
-
                     Button(action: { showEtichette = true }) {
                         Text("Etichette")
                             .font(.title3)
@@ -1667,7 +1834,8 @@ struct ProjectManagerView: View {
                             .padding()
                             .overlay(
                               RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.orange, lineWidth: 2)
+                                .stroke(Color.orange,
+                                        lineWidth: 2)
                             )
                     }
                     .contentShape(Rectangle())
@@ -1676,14 +1844,19 @@ struct ProjectManagerView: View {
             }
             .navigationBarTitle("", displayMode: .inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    ProjectEditToggleButton(isEditing: $editingProjects)
+                ToolbarItem(placement:
+                              .navigationBarLeading) {
+                    ProjectEditToggleButton(
+                      isEditing: $editingProjects)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement:
+                              .navigationBarTrailing) {
                     if showHowButton {
                         Button(action: { showHow = true }) {
                             Text("Come funziona l'app")
-                                .font(.custom("Permanent Marker", size: 20))
+                                .font(.custom(
+                                  "Permanent Marker",
+                                  size: 20))
                                 .foregroundColor(.black)
                                 .padding(8)
                                 .background(Color.yellow)
@@ -1691,7 +1864,9 @@ struct ProjectManagerView: View {
                         }
                         .contentShape(Rectangle())
                     } else {
-                        Button(action: { showHowButton = true }) {
+                        Button(action: {
+                            showHowButton = true
+                        }) {
                             Text("?")
                                 .font(.system(size: 40))
                                 .bold()
@@ -1702,17 +1877,21 @@ struct ProjectManagerView: View {
                 }
             }
             .sheet(isPresented: $showEtichette) {
-                LabelsManagerView(projectManager: projectManager)
+                LabelsManagerView(
+                  projectManager: projectManager)
             }
-            .confirmationDialog("Esporta Monte Ore",
-                                isPresented: $showExportOpts,
-                                titleVisibility: .visible) {
+            .confirmationDialog(
+              "Esporta Monte Ore",
+              isPresented: $showExportOpts,
+              titleVisibility: .visible
+            ) {
                 Button("Backup (JSON)") {
                     exportURL = projectManager.getExportURL()
                     showActivity = true
                 }
                 Button("Esporta CSV monte ore") {
-                    exportURL = projectManager.getCSVExportURL()
+                    exportURL =
+                      projectManager.getCSVExportURL()
                     showActivity = true
                 }
                 Button("Annulla", role: .cancel) {}
@@ -1725,20 +1904,24 @@ struct ProjectManagerView: View {
                 }
             }
             .fileImporter(isPresented: $showImport,
-                          allowedContentTypes: [UTType.json]) { res in
+                          allowedContentTypes: [UTType.json])
+            { res in
                 switch res {
                 case .success(let url):
-                    guard url.startAccessingSecurityScopedResource() else {
+                    guard url.startAccessingSecurityScopedResource()
+                    else {
                         importError = AlertError(
                           message: "Non è possibile accedere al file.")
                         return
                     }
-                    defer { url.stopAccessingSecurityScopedResource() }
+                    defer {
+                        url.stopAccessingSecurityScopedResource()
+                    }
                     do {
                         let data = try Data(contentsOf: url)
-                        let imp  = try JSONDecoder()
-                                      .decode(ProjectManager.ExportData.self,
-                                              from: data)
+                        let imp = try JSONDecoder()
+                          .decode(ProjectManager.ExportData.self,
+                                  from: data)
                         pendingImport = imp
                         showImportConfirm = true
                     } catch {
@@ -1751,41 +1934,59 @@ struct ProjectManagerView: View {
                 }
             }
             .alert(item: $importError) { e in
-                Alert(title: Text("Errore"),
-                      message: Text(e.message),
-                      dismissButton: .default(Text("OK")))
+                Alert(
+                  title: Text("Errore"),
+                  message: Text(e.message),
+                  dismissButton: .default(Text("OK"))
+                )
             }
             .sheet(isPresented: $showImportConfirm) {
                 if let pending = pendingImport {
                     ImportConfirmationView(
                         message: "Attenzione: sovrascrivere tutto?",
                         importAction: {
+                            // wipe existing JSON backups:
                             let docs = FileManager.default
-                                        .urls(for: .documentDirectory,
-                                              in: .userDomainMask)[0]
-                            if let files = try? FileManager.default.contentsOfDirectory(
-                                                at: docs,
-                                                includingPropertiesForKeys: nil)
+                              .urls(for: .documentDirectory,
+                                    in: .userDomainMask)[0]
+                            if let files = try?
+                              FileManager.default.contentsOfDirectory(
+                                at: docs,
+                                includingPropertiesForKeys: nil)
                             {
                                 for file in files {
                                     if file.pathExtension == "json"
-                                       && file.lastPathComponent != projectManager.projectsFileName
-                                       && file.lastPathComponent != "labels.json"
-                                       && file.lastPathComponent != projectManager.backupOrderFileName
+                                       && file.lastPathComponent
+                                        != projectManager
+                                         .projectsFileName
+                                       && file.lastPathComponent
+                                        != "labels.json"
+                                       && file.lastPathComponent
+                                        != projectManager
+                                         .backupOrderFileName
                                     {
-                                        try? FileManager.default.removeItem(at: file)
+                                        try? FileManager.default
+                                          .removeItem(at: file)
                                     }
                                 }
                             }
-                            projectManager.projects       = pending.projects
-                            projectManager.backupProjects = pending.backupProjects
+                            projectManager.projects =
+                              pending.projects
+                            projectManager.backupProjects =
+                              pending.backupProjects
                             projectManager.saveProjects()
                             projectManager.saveBackupOrder()
                             projectManager.saveBackupProjects()
-                            projectManager.labels         = pending.labels
-                            projectManager.lockedLabelID          = pending.lockedLabelID.flatMap(UUID.init)
-                            projectManager.lockedBackupLabelID    = pending.lockedBackupLabelID.flatMap(UUID.init)
-                            projectManager.currentProject = projectManager.projects.first
+                            projectManager.labels =
+                              pending.labels
+                            projectManager.lockedLabelID =
+                              pending.lockedLabelID
+                              .flatMap(UUID.init)
+                            projectManager.lockedBackupLabelID =
+                              pending.lockedBackupLabelID
+                              .flatMap(UUID.init)
+                            projectManager.currentProject =
+                              projectManager.projects.first
                             projectManager.saveLabels()
                             pendingImport = nil
                             showImportConfirm = false
@@ -1799,14 +2000,10 @@ struct ProjectManagerView: View {
                     Text("Errore: nessun dato da importare.")
                 }
             }
-            .sheet(isPresented: $showHow, onDismiss: { showHowButton = false }) {
-                ComeFunzionaSheetView { showHow = false }
-            }
-            .onAppear {
-                NotificationCenter.default.addObserver(
-                  forName: Notification.Name("CycleProjectNotification"),
-                  object: nil, queue: .main) { _ in
-                    // nothing
+            .sheet(isPresented: $showHow,
+                   onDismiss: { showHowButton = false }) {
+                ComeFunzionaSheetView {
+                    showHow = false
                 }
             }
         }
@@ -1816,24 +2013,28 @@ struct ProjectManagerView: View {
 // MARK: - ImportConfirmationView
 struct ImportConfirmationView: View {
     let message: String
-    let importAction: ()->Void
-    let cancelAction: ()->Void
+    let importAction: () -> Void
+    let cancelAction: () -> Void
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("Importa File").font(.title).bold()
-            Text(message).multilineTextAlignment(.center).padding()
+            Text("Importa File")
+                .font(.title)
+                .bold()
+            Text(message)
+                .multilineTextAlignment(.center)
+                .padding()
             HStack {
                 Button(action: cancelAction) {
                     Text("Annulla")
                         .foregroundColor(.red)
                         .padding()
                         .overlay(
-                          RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.red, lineWidth: 2))
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.red, lineWidth: 2)
+                        )
                 }
                 .contentShape(Rectangle())
-
                 Button(action: importAction) {
                     Text("Importa")
                         .foregroundColor(.white)
@@ -1848,14 +2049,15 @@ struct ImportConfirmationView: View {
     }
 }
 
-// MARK: - Supporting Views
+// MARK: - NoNotesPromptView / PopupView / NonCHoSbattiSheetView
 struct NoNotesPromptView: View {
-    var onOk: ()->Void
-    var onNonCHoSbatti: ()->Void
+    var onOk: () -> Void
+    var onNonCHoSbatti: () -> Void
     var body: some View {
         VStack(spacing: 20) {
             Text("Nessun progetto attivo")
-                .font(.title).bold()
+                .font(.title)
+                .bold()
             Text("Per iniziare, crea o seleziona un progetto.")
                 .multilineTextAlignment(.center)
             HStack(spacing: 20) {
@@ -1867,7 +2069,6 @@ struct NoNotesPromptView: View {
                         .cornerRadius(8)
                 }
                 .contentShape(Rectangle())
-
                 Button(action: onNonCHoSbatti) {
                     Text("Non CHo Sbatti")
                         .padding()
@@ -1899,10 +2100,10 @@ struct PopupView: View {
 }
 
 struct NonCHoSbattiSheetView: View {
-    var onDismiss: ()->Void
+    var onDismiss: () -> Void
     var body: some View {
         VStack(spacing: 20) {
-            Text("Frate, nemmeno io...")
+            Text("Frate, nemmeno io…")
                 .font(.custom("Permanent Marker", size: 28))
                 .bold()
                 .multilineTextAlignment(.center)
@@ -1921,43 +2122,54 @@ struct NonCHoSbattiSheetView: View {
     }
 }
 
-// MARK: - ContentView
+// MARK: - ContentView with persistent managerView
 struct ContentView: View {
     @ObservedObject var projectManager = ProjectManager()
 
-    @State private var showManager  = false
-    @State private var showNoSbatti = false
-    @State private var showMedal    = false
+    @State private var showProjectManager = false
+    @State private var projectManagerView: ProjectManagerView?
+
+    @State private var showNonCHoSbattiSheet = false
+    @State private var showPopup = false
     @AppStorage("medalAwarded") private var medalAwarded = false
 
     var body: some View {
         GeometryReader { geo in
-            let isLand   = geo.size.width > geo.size.height
-            let noProj   = projectManager.currentProject == nil
-            let isBackup = projectManager.currentProject.flatMap {
-                  proj in projectManager.backupProjects.first(
-                     where: { $0.id == proj.id })
-                } != nil
+            let isLandscape = geo.size.width > geo.size.height
+            let noProj = projectManager.currentProject == nil
+            let isBackup = projectManager.currentProject.flatMap { proj in
+                projectManager.backupProjects.first {
+                    $0.id == proj.id
+                }
+            } != nil
 
             ZStack {
-                Color(hex: "#54c0ff").edgesIgnoringSafeArea(.all)
+                Color(hex: "#54c0ff")
+                    .edgesIgnoringSafeArea(.all)
 
                 VStack(spacing: 20) {
                     if noProj {
                         NoNotesPromptView(
-                          onOk:    { showManager = true },
-                          onNonCHoSbatti: { showNoSbatti = true })
-                    } else {
-                        if let proj = projectManager.currentProject {
-                            NoteView(
-                              project: proj,
-                              projectManager: projectManager)
-                            .frame(
-                              width: isLand ? geo.size.width
-                                            : geo.size.width - 40,
-                              height: isLand ? geo.size.height * 0.4
-                                            : geo.size.height * 0.6)
-                        }
+                          onOk: { presentManager() },
+                          onNonCHoSbatti: {
+                            showNonCHoSbattiSheet = true
+                          }
+                        )
+                    } else if let proj = projectManager.currentProject {
+                        NoteView(
+                          project: proj,
+                          projectManager: projectManager
+                        )
+                        .frame(
+                          width: isLandscape
+                            ? geo.size.width
+                            : geo.size.width - 40,
+                          height: isLandscape
+                            ? geo.size.height * 0.4
+                            : geo.size.height * 0.6
+                        )
+                        .cornerRadius(25)
+                        .clipped()
                     }
 
                     // Pigia il tempo & Torna ai progetti correnti
@@ -1967,41 +2179,64 @@ struct ContentView: View {
                                 .font(.title2)
                                 .foregroundColor(.white)
                                 .frame(
-                                  width: isLand ? 100 : 140,
-                                  height: isLand ? 100 : 140)
+                                  width: isLandscape ? 100 : 140,
+                                  height: isLandscape ? 100 : 140
+                                )
                                 .background(Circle().fill(Color.black))
                         }
-                        .disabled(isBackup || projectManager.currentProject == nil)
+                        .disabled(
+                            isBackup
+                            || projectManager.currentProject == nil
+                        )
 
                         if isBackup {
                             Button(action: {
+                                // if a current-label is locked, go to its first
+                                if let lid = projectManager.lockedLabelID,
+                                   let first = projectManager.projects
+                                    .first(where: { $0.labelID == lid })
+                                {
+                                    projectManager.currentProject = first
+                                } else {
+                                    // fallback
+                                    projectManager.currentProject =
+                                      projectManager.projects.first
+                                }
                                 projectManager.lockedBackupLabelID = nil
-                                projectManager.currentProject = projectManager.projects.first
                             }) {
                                 Text("Torna ai progetti correnti")
                                     .multilineTextAlignment(.center)
                                     .foregroundColor(.black)
                                     .frame(
-                                      width: isLand ? 100 : 140,
-                                      height: isLand ? 100 : 140)
-                                    .background(Circle().fill(Color(hex: "#54c0ff")))
+                                      width: isLandscape ? 100 : 140,
+                                      height: isLandscape ? 100 : 140
+                                    )
+                                    .background(
+                                      Circle().fill(
+                                        Color(hex: "#54c0ff")
+                                      )
+                                    )
                             }
                         }
                     }
 
                     // Gestione Progetti & Split Arrows
                     HStack {
-                        Button(action: { showManager = true }) {
+                        Button(action: { presentManager() }) {
                             Text("Gestione\nProgetti")
                                 .font(.headline)
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.black)
                                 .frame(
-                                  width: isLand ? 90 : 140,
-                                  height: isLand ? 100 : 140)
+                                  width: isLandscape ? 90 : 140,
+                                  height: isLandscape ? 100 : 140
+                                )
                                 .background(Circle().fill(Color.white))
                                 .overlay(
-                                  Circle().stroke(Color.black, lineWidth: 2))
+                                  Circle().stroke(
+                                    Color.black, lineWidth: 2
+                                  )
+                                )
                         }
                         .contentShape(Rectangle())
 
@@ -2011,13 +2246,15 @@ struct ContentView: View {
                             Circle()
                                 .fill(Color.yellow)
                                 .frame(
-                                  width: isLand ? 90 : 140,
-                                  height: isLand ? 90 : 140)
+                                  width: isLandscape ? 90 : 140,
+                                  height: isLandscape ? 90 : 140
+                                )
                                 .overlay(
                                   Rectangle()
                                     .frame(
-                                      width: isLand ? 90 : 140,
-                                      height: 1),
+                                        width: isLandscape ? 90 : 140,
+                                        height: 1
+                                    ),
                                   alignment: .center
                                 )
 
@@ -2025,12 +2262,15 @@ struct ContentView: View {
                                 Button(action: previousProject) {
                                     Color.clear
                                 }
-                                .frame(height: isLand ? 45 : 70)
-
+                                .frame(
+                                  height: isLandscape ? 45 : 70
+                                )
                                 Button(action: cycleProject) {
                                     Color.clear
                                 }
-                                .frame(height: isLand ? 45 : 70)
+                                .frame(
+                                  height: isLandscape ? 45 : 70
+                                )
                             }
 
                             VStack {
@@ -2044,80 +2284,144 @@ struct ContentView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, isLand ? 10 : 30)
-                    .padding(.bottom, isLand ? 0 : 30)
+                    .padding(
+                      .horizontal,
+                      isLandscape ? 10 : 30
+                    )
+                    .padding(
+                      .bottom,
+                      isLandscape ? 0 : 30
+                    )
                 }
 
-                if showMedal {
+                if showPopup {
                     PopupView(
-                      message: "Congratulazioni! Hai guadagnato la medaglia “Sbattimenti zero eh”")
-                        .transition(.scale)
-                }
-            }
-            .sheet(isPresented: $showManager) {
-                ProjectManagerView(projectManager: projectManager)
-            }
-            .sheet(isPresented: $showNoSbatti) {
-                NonCHoSbattiSheetView {
-                    if !medalAwarded {
-                        medalAwarded = true
-                        showMedal = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation { showMedal = false }
-                        }
-                    }
-                    showNoSbatti = false
+                      message:
+                        "Congratulazioni! Hai guadagnato la medaglia “Sbattimenti zero eh”"
+                    )
+                    .transition(.scale)
                 }
             }
         }
+        .sheet(isPresented: $showProjectManager) {
+            projectManagerView
+        }
+        .sheet(isPresented: $showNonCHoSbattiSheet) {
+            NonCHoSbattiSheetView {
+                if !medalAwarded {
+                    medalAwarded = true
+                    showPopup = true
+                    DispatchQueue.main.asyncAfter(deadline:
+                      .now() + 5) {
+                        withAnimation { showPopup = false }
+                    }
+                }
+                showNonCHoSbattiSheet = false
+            }
+        }
+    }
+
+    private func presentManager() {
+        if projectManagerView == nil {
+            projectManagerView =
+              ProjectManagerView(projectManager:
+                                   projectManager)
+        }
+        showProjectManager = true
     }
 
     private func cycleProject() {
-        guard let cur = projectManager.currentProject else { return }
-        let isBackup = projectManager.backupProjects.contains { $0.id == cur.id }
-
-        if isBackup, let lockedB = projectManager.lockedBackupLabelID {
-            let arr = projectManager.backupProjects.filter { $0.labelID == lockedB }
-            guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-            projectManager.currentProject = arr[(idx + 1) % arr.count]
+        guard let cur = projectManager.currentProject else {
             return
         }
-        if !isBackup, let lockedC = projectManager.lockedLabelID {
-            let arr = projectManager.projects.filter { $0.labelID == lockedC }
-            guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-            projectManager.currentProject = arr[(idx + 1) % arr.count]
+        let isBackup = projectManager.backupProjects.contains {
+            $0.id == cur.id
+        }
+
+        if isBackup,
+           let lockedB =
+             projectManager.lockedBackupLabelID
+        {
+            let arr = projectManager.backupProjects
+                .filter { $0.labelID == lockedB }
+            guard let idx = arr.firstIndex(
+              where: { $0.id == cur.id }),
+                  arr.count > 1
+            else { return }
+            projectManager.currentProject =
+              arr[(idx + 1) % arr.count]
+            return
+        }
+        if !isBackup,
+           let lockedC = projectManager.lockedLabelID
+        {
+            let arr = projectManager.projects
+                .filter { $0.labelID == lockedC }
+            guard let idx = arr.firstIndex(
+              where: { $0.id == cur.id }),
+                  arr.count > 1
+            else { return }
+            projectManager.currentProject =
+              arr[(idx + 1) % arr.count]
             return
         }
 
         let arr = isBackup
             ? projectManager.displayedBackupProjects()
             : projectManager.displayedCurrentProjects()
-        guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-        projectManager.currentProject = arr[(idx + 1) % arr.count]
+        guard let idx = arr.firstIndex(
+          where: { $0.id == cur.id }),
+              arr.count > 1
+        else { return }
+        projectManager.currentProject =
+          arr[(idx + 1) % arr.count]
     }
 
     private func previousProject() {
-        guard let cur = projectManager.currentProject else { return }
-        let isBackup = projectManager.backupProjects.contains { $0.id == cur.id }
-
-        if isBackup, let lockedB = projectManager.lockedBackupLabelID {
-            let arr = projectManager.backupProjects.filter { $0.labelID == lockedB }
-            guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
+        guard let cur = projectManager.currentProject else {
             return
         }
-        if !isBackup, let lockedC = projectManager.lockedLabelID {
-            let arr = projectManager.projects.filter { $0.labelID == lockedC }
-            guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
+        let isBackup = projectManager.backupProjects.contains {
+            $0.id == cur.id
+        }
+
+        if isBackup,
+           let lockedB =
+             projectManager.lockedBackupLabelID
+        {
+            let arr = projectManager.backupProjects
+                .filter { $0.labelID == lockedB }
+            guard let idx = arr.firstIndex(
+              where: { $0.id == cur.id }),
+                  arr.count > 1
+            else { return }
+            projectManager.currentProject =
+              arr[(idx - 1 + arr.count) % arr.count]
+            return
+        }
+        if !isBackup,
+           let lockedC = projectManager.lockedLabelID
+        {
+            let arr = projectManager.projects
+                .filter { $0.labelID == lockedC }
+            guard let idx = arr.firstIndex(
+              where: { $0.id == cur.id }),
+                  arr.count > 1
+            else { return }
+            projectManager.currentProject =
+              arr[(idx - 1 + arr.count) % arr.count]
             return
         }
 
         let arr = isBackup
             ? projectManager.displayedBackupProjects()
             : projectManager.displayedCurrentProjects()
-        guard let idx = arr.firstIndex(where: { $0.id == cur.id }), arr.count > 1 else { return }
-        projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
+        guard let idx = arr.firstIndex(
+          where: { $0.id == cur.id }),
+              arr.count > 1
+        else { return }
+        projectManager.currentProject =
+          arr[(idx - 1 + arr.count) % arr.count]
     }
 
     private func mainButtonTapped() {
@@ -2125,21 +2429,30 @@ struct ContentView: View {
             playSound(success: false)
             return
         }
-        if projectManager.backupProjects.contains(where: { $0.id == proj.id }) { return }
+        if projectManager.backupProjects.contains(where: {
+           $0.id == proj.id }) { return }
         let now = Date()
-        let df = DateFormatter(); df.locale = Locale(identifier: "it_IT")
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "it_IT")
         df.dateFormat = "EEEE dd/MM/yy"
         let giornoStr = df.string(from: now).capitalized
-        let tf = DateFormatter(); tf.locale = Locale(identifier: "it_IT")
+        let tf = DateFormatter()
+        tf.locale = Locale(identifier: "it_IT")
         tf.dateFormat = "HH:mm"
         let timeStr = tf.string(from: now)
         projectManager.backupCurrentProjectIfNeeded(
-          proj, currentDate: now, currentGiorno: giornoStr)
+          proj, currentDate: now,
+          currentGiorno: giornoStr)
         if proj.noteRows.isEmpty
            || proj.noteRows.last?.giorno != giornoStr
         {
             proj.noteRows.append(
-              NoteRow(giorno: giornoStr, orari: timeStr + "-", note: ""))
+              NoteRow(
+                giorno: giornoStr,
+                orari: timeStr + "-",
+                note: ""
+              )
+            )
         } else {
             var last = proj.noteRows.removeLast()
             if last.orari.hasSuffix("-") {
@@ -2154,7 +2467,7 @@ struct ContentView: View {
     }
 
     private func playSound(success: Bool) {
-        // Implement AVFoundation if desired
+        // AVFoundation if desired
     }
 }
 
@@ -2162,6 +2475,8 @@ struct ContentView: View {
 @main
 struct MyTimeTrackerApp: App {
     var body: some Scene {
-        WindowGroup { ContentView() }
+        WindowGroup {
+            ContentView()
+        }
     }
 }
