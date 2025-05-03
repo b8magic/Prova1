@@ -312,11 +312,10 @@ class ProjectManager: ObservableObject {
                    && file.pathExtension == "json"
                    && file.lastPathComponent != backupOrderFileName
                 {
-                    if var p = try? JSONDecoder().decode(
+                    if let p = try? JSONDecoder().decode(
                                   Project.self,
                                   from: Data(contentsOf: file))
                     {
-                        p.id = UUID()
                         backupProjects.append(p)
                     }
                 }
@@ -467,15 +466,16 @@ class ProjectManager: ObservableObject {
     }
 
     // MARK: Helpers
-    private func postCycleNotification() {
+    func postCycleNotification() {
         NotificationCenter.default.post(
           name: Notification.Name("CycleProjectNotification"),
           object: nil)
     }
     func cleanupEmptyLock() {
         if let lid = lockedLabelID {
-            let has = projects.contains { $0.labelID == lid }
-            if !has {
+            let hasCurrent = projects.contains { $0.labelID == lid }
+            let hasBackup  = backupProjects.contains { $0.labelID == lid }
+            if !(hasCurrent || hasBackup) {
                 lockedLabelID = nil
                 currentProject = projects.first
             }
@@ -532,7 +532,12 @@ struct LabelAssignmentView: View {
                                     closeVisible = true
                                 }
                             }
-                            projectManager.saveProjects()
+                            if projectManager.backupProjects.contains(where: { $0.id == project.id }) {
+                                projectManager.saveBackupProjects()
+                                projectManager.saveBackupOrder()
+                            } else {
+                                projectManager.saveProjects()
+                            }
                             projectManager.objectWillChange.send()
                             projectManager.cleanupEmptyLock()
                         }
@@ -541,6 +546,7 @@ struct LabelAssignmentView: View {
                 if closeVisible {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
+                        projectManager.objectWillChange.send()
                     }) {
                         Text("Chiudi")
                             .font(.title2)
@@ -589,17 +595,17 @@ struct CombinedProjectEditSheet: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding(.horizontal)
                 Button(action: {
-                    if projectManager.backupProjects.contains(where: {
-                        $0.id == project.id }) {
-                        let old = project.name
+                    let oldName = project.name
+                    if projectManager.backupProjects.contains(where: { $0.id == project.id }) {
+                        // rename backup file
+                        let docs = FileManager.default
+                                    .urls(for: .documentDirectory, in: .userDomainMask)[0]
+                        let oldURL = docs.appendingPathComponent("\(oldName).json")
                         project.name = newName
-                        projectManager.deleteBackupProject(project: Project(name: old))
-                        projectManager.backupProjects.removeAll(where: { $0.name == old })
-                        projectManager.backupProjects.append(project)
-                        let url = projectManager.getURLForBackup(project: project)
-                        if let d = try? JSONEncoder().encode(project) {
-                            try? d.write(to: url)
-                        }
+                        let newURL = docs.appendingPathComponent("\(project.name).json")
+                        try? FileManager.default.moveItem(at: oldURL, to: newURL)
+                        projectManager.saveBackupOrder()
+                        projectManager.saveBackupProjects()
                     } else {
                         projectManager.renameProject(project: project,
                                                      newName: newName)
@@ -638,8 +644,7 @@ struct CombinedProjectEditSheet: View {
                       title: Text("Elimina progetto"),
                       message: Text("Sei sicuro di voler eliminare \(project.name)?"),
                       primaryButton: .destructive(Text("Elimina")) {
-                          if projectManager.backupProjects.contains(where: {
-                              $0.id == project.id }) {
+                          if projectManager.backupProjects.contains(where: { $0.id == project.id }) {
                               projectManager.deleteBackupProject(project: project)
                           } else {
                               projectManager.deleteProject(project: project)
@@ -760,26 +765,30 @@ struct LabelHeaderView: View {
                 .underline()
                 .foregroundColor(Color(hex: label.color))
             Spacer()
-            Button(action: {
-                if projectManager.lockedLabelID != label.id {
-                    projectManager.lockedLabelID = label.id
-                    if let first = projectManager.projects.first(
-                       where: { $0.labelID == label.id }) {
-                        projectManager.currentProject = first
+            let hasCurrent = projectManager.projects.contains { $0.labelID == label.id }
+            let hasBackup  = projectManager.backupProjects.contains { $0.labelID == label.id }
+            if (hasCurrent || hasBackup) && !isBackup {
+                Button(action: {
+                    if projectManager.lockedLabelID != label.id {
+                        projectManager.lockedLabelID = label.id
+                        if let first = projectManager.projects.first(
+                           where: { $0.labelID == label.id }) {
+                            projectManager.currentProject = first
+                        }
+                    } else {
+                        projectManager.lockedLabelID = nil
+                        projectManager.currentProject = projectManager.projects.first
                     }
-                } else {
-                    projectManager.lockedLabelID = nil
-                    projectManager.currentProject = projectManager.projects.first
+                    projectManager.cleanupEmptyLock()
+                }) {
+                    Image(systemName:
+                          projectManager.lockedLabelID == label.id
+                          ? "lock.fill" : "lock.open")
+                        .foregroundColor(.black)
                 }
-                projectManager.cleanupEmptyLock()
-            }) {
-                Image(systemName:
-                      projectManager.lockedLabelID == label.id
-                      ? "lock.fill" : "lock.open")
-                    .foregroundColor(.black)
+                .buttonStyle(PlainButtonStyle())
+                .contentShape(Rectangle())
             }
-            .buttonStyle(PlainButtonStyle())
-            .contentShape(Rectangle())
         }
         .padding(.vertical, 8)
         .background(isTargeted ? Color.blue.opacity(0.2) : Color.clear)
@@ -795,6 +804,7 @@ struct LabelHeaderView: View {
                         if let i = projectManager.backupProjects.firstIndex(where: {
                             $0.id == uuid }) {
                             projectManager.backupProjects[i].labelID = label.id
+                            projectManager.saveBackupProjects()
                             projectManager.saveBackupOrder()
                         }
                     } else {
@@ -1569,10 +1579,9 @@ struct ProjectManagerView: View {
                         message: "Attenzione: sovrascrivere tutto?",
                         importAction: {
                             projectManager.projects       = pending.projects
-                            projectManager.backupProjects = pending.backupProjects.map {
-                              var p = $0; p.id = UUID(); return p
-                            }
+                            projectManager.backupProjects = pending.backupProjects
                             projectManager.saveBackupOrder()
+                            projectManager.saveBackupProjects()
                             projectManager.labels         = pending.labels
                             if let l = pending.lockedLabelID,
                                let u = UUID(uuidString: l) {
@@ -1583,7 +1592,6 @@ struct ProjectManagerView: View {
                             projectManager.currentProject = projectManager.projects.first
                             projectManager.saveProjects()
                             projectManager.saveLabels()
-                            projectManager.saveBackupProjects()
                             pendingImport = nil
                             showImportConfirm = false
                         },
@@ -1611,57 +1619,45 @@ struct ProjectManagerView: View {
     }
 
     private func cycleProject() {
-        if let cur = projectManager.currentProject,
-           projectManager.backupProjects.map(\.id).contains(cur.id)
-        {
-            let avail = projectManager.backupProjects
-            guard let idx = avail.firstIndex(where: { $0.id == cur.id }),
-                  avail.count > 1 else { return }
-            projectManager.currentProject = avail[(idx + 1) % avail.count]
-            return
-        }
-        let avail: [Project]
-        if let lid = projectManager.lockedLabelID {
-          avail = projectManager.projects.filter { $0.labelID == lid }
+        guard let cur = projectManager.currentProject else { return }
+        if projectManager.backupProjects.contains(where: { $0.id == cur.id }) {
+            let arr = projectManager.backupProjects
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx + 1) % arr.count]
         } else {
-          var list: [Project] = []
-          list += projectManager.projects.filter { $0.labelID == nil }
-          for lab in projectManager.labels {
-            list += projectManager.projects.filter { $0.labelID == lab.id }
-          }
-          avail = list
+            let arr: [Project] = {
+              if let lid = projectManager.lockedLabelID {
+                return projectManager.projects.filter { $0.labelID == lid }
+              } else {
+                return projectManager.projects
+              }
+            }()
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx + 1) % arr.count]
         }
-        guard let cur = projectManager.currentProject,
-              let idx = avail.firstIndex(where: { $0.id == cur.id }),
-              avail.count > 1 else { return }
-        projectManager.currentProject = avail[(idx + 1) % avail.count]
     }
 
     private func previousProject() {
-        if let cur = projectManager.currentProject,
-           projectManager.backupProjects.map(\.id).contains(cur.id)
-        {
-            let avail = projectManager.backupProjects
-            guard let idx = avail.firstIndex(where: { $0.id == cur.id }),
-                  avail.count > 1 else { return }
-            projectManager.currentProject = avail[(idx - 1 + avail.count) % avail.count]
-            return
-        }
-        let avail: [Project]
-        if let lid = projectManager.lockedLabelID {
-          avail = projectManager.projects.filter { $0.labelID == lid }
+        guard let cur = projectManager.currentProject else { return }
+        if projectManager.backupProjects.contains(where: { $0.id == cur.id }) {
+            let arr = projectManager.backupProjects
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
         } else {
-          var list: [Project] = []
-          list += projectManager.projects.filter { $0.labelID == nil }
-          for lab in projectManager.labels {
-            list += projectManager.projects.filter { $0.labelID == lab.id }
-          }
-          avail = list
+            let arr: [Project] = {
+              if let lid = projectManager.lockedLabelID {
+                return projectManager.projects.filter { $0.labelID == lid }
+              } else {
+                return projectManager.projects
+              }
+            }()
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
         }
-        guard let cur = projectManager.currentProject,
-              let idx = avail.firstIndex(where: { $0.id == cur.id }),
-              avail.count > 1 else { return }
-        projectManager.currentProject = avail[(idx - 1 + avail.count) % avail.count]
     }
 }
 
@@ -1926,57 +1922,45 @@ struct ContentView: View {
     }
 
     private func cycleProject() {
-        if let cur = projectManager.currentProject,
-           projectManager.backupProjects.map(\.id).contains(cur.id)
-        {
-            let avail = projectManager.backupProjects
-            guard let idx = avail.firstIndex(where: { $0.id == cur.id }),
-                  avail.count > 1 else { return }
-            projectManager.currentProject = avail[(idx + 1) % avail.count]
-            return
-        }
-        let avail: [Project]
-        if let lid = projectManager.lockedLabelID {
-          avail = projectManager.projects.filter { $0.labelID == lid }
+        guard let cur = projectManager.currentProject else { return }
+        if projectManager.backupProjects.contains(where: { $0.id == cur.id }) {
+            let arr = projectManager.backupProjects
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx + 1) % arr.count]
         } else {
-          var list: [Project] = []
-          list += projectManager.projects.filter { $0.labelID == nil }
-          for lab in projectManager.labels {
-            list += projectManager.projects.filter { $0.labelID == lab.id }
-          }
-          avail = list
+            let arr: [Project] = {
+              if let lid = projectManager.lockedLabelID {
+                return projectManager.projects.filter { $0.labelID == lid }
+              } else {
+                return projectManager.projects
+              }
+            }()
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx + 1) % arr.count]
         }
-        guard let cur = projectManager.currentProject,
-              let idx = avail.firstIndex(where: { $0.id == cur.id }),
-              avail.count > 1 else { return }
-        projectManager.currentProject = avail[(idx + 1) % avail.count]
     }
 
     private func previousProject() {
-        if let cur = projectManager.currentProject,
-           projectManager.backupProjects.map(\.id).contains(cur.id)
-        {
-            let avail = projectManager.backupProjects
-            guard let idx = avail.firstIndex(where: { $0.id == cur.id }),
-                  avail.count > 1 else { return }
-            projectManager.currentProject = avail[(idx - 1 + avail.count) % avail.count]
-            return
-        }
-        let avail: [Project]
-        if let lid = projectManager.lockedLabelID {
-          avail = projectManager.projects.filter { $0.labelID == lid }
+        guard let cur = projectManager.currentProject else { return }
+        if projectManager.backupProjects.contains(where: { $0.id == cur.id }) {
+            let arr = projectManager.backupProjects
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
         } else {
-          var list: [Project] = []
-          list += projectManager.projects.filter { $0.labelID == nil }
-          for lab in projectManager.labels {
-            list += projectManager.projects.filter { $0.labelID == lab.id }
-          }
-          avail = list
+            let arr: [Project] = {
+              if let lid = projectManager.lockedLabelID {
+                return projectManager.projects.filter { $0.labelID == lid }
+              } else {
+                return projectManager.projects
+              }
+            }()
+            guard let idx = arr.firstIndex(where: { $0.id == cur.id }),
+                  arr.count > 1 else { return }
+            projectManager.currentProject = arr[(idx - 1 + arr.count) % arr.count]
         }
-        guard let cur = projectManager.currentProject,
-              let idx = avail.firstIndex(where: { $0.id == cur.id }),
-              avail.count > 1 else { return }
-        projectManager.currentProject = avail[(idx - 1 + avail.count) % avail.count]
     }
 
     private func mainButtonTapped() {
