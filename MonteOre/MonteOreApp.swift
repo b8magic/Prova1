@@ -122,10 +122,11 @@ class Project: Identifiable, ObservableObject, Codable {
     }
     required init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id       = try c.decode(UUID.self, forKey: .id)
+        id       = try c.decode(UUID.self,   forKey: .id)
         name     = try c.decode(String.self, forKey: .name)
-        noteRows = try c.decode([NoteRow].self, forKey: .noteRows)
-        labelID  = try? c.decode(UUID.self, forKey: .labelID)
+        noteRows = try c.decode([NoteRow].self,
+                                forKey: .noteRows)
+        labelID  = try? c.decode(UUID.self,  forKey: .labelID)
     }
     func encode(to e: Encoder) throws {
         var c = e.container(keyedBy: CodingKeys.self)
@@ -196,11 +197,18 @@ class ProjectManager: ObservableObject {
         loadBackupOrder()
         loadLabels()
 
-        if let s = UserDefaults.standard.string(forKey: "lockedLabelID"),
-           let u = UUID(uuidString: s) { lockedLabelID = u }
+        if let s = UserDefaults.standard.string(
+           forKey: "lockedLabelID"),
+           let u = UUID(uuidString: s)
+        {
+            lockedLabelID = u
+        }
         if let s = UserDefaults.standard.string(
            forKey: "lockedBackupLabelID"),
-           let u = UUID(uuidString: s) { lockedBackupLabelID = u }
+           let u = UUID(uuidString: s)
+        {
+            lockedBackupLabelID = u
+        }
 
         if let lastId = UserDefaults.standard.string(
            forKey: "lastProjectId"),
@@ -209,7 +217,7 @@ class ProjectManager: ObservableObject {
             if let p = projects.first(where: { $0.id == uuid }) {
                 currentProject = p
             } else if let b = backupProjects.first(where: {
-                      $0.id == uuid }) {
+                          $0.id == uuid }) {
                 currentProject = b
             } else {
                 currentProject = projects.first
@@ -289,7 +297,8 @@ class ProjectManager: ObservableObject {
         let url = getProjectsFileURL()
         if let d = try? Data(contentsOf: url),
            let arr = try? JSONDecoder().decode([Project].self,
-                                               from: d) {
+                                               from: d)
+        {
             projects = arr
         }
     }
@@ -299,7 +308,9 @@ class ProjectManager: ObservableObject {
           .appendingPathComponent("\(project.name).json")
     }
     func backupCurrentProjectIfNeeded(
-      _ project: Project, currentDate: Date, currentGiorno: String
+      _ project: Project,
+      currentDate: Date,
+      currentGiorno: String
     ) {
         guard let last = project.noteRows.last,
               last.giorno != currentGiorno,
@@ -374,12 +385,14 @@ class ProjectManager: ObservableObject {
             var ordered: [Project] = []
             for idStr in order {
                 if let uuid = UUID(uuidString: idStr),
-                   let proj = backupProjects.first(where: { $0.id == uuid }) {
+                   let proj = backupProjects.first(where: { $0.id == uuid })
+                {
                     ordered.append(proj)
                 }
             }
             for p in backupProjects where
-                !ordered.contains(where: { $0.id == p.id }) {
+                !ordered.contains(where: { $0.id == p.id })
+            {
                 ordered.append(p)
             }
             backupProjects = ordered
@@ -508,11 +521,23 @@ class ProjectManager: ObservableObject {
         }
         return nil
     }
+
+    /// CSV export now uses displayed order and is named MonteoreCSV.txt
     func getCSVExportURL() -> URL? {
         let url = FileManager.default.temporaryDirectory
-                  .appendingPathComponent("MonteOreExport.txt")
+                  .appendingPathComponent("MonteoreCSV.txt")
         var txt = ""
+        // Current projects
         for p in projects {
+            txt += "\"\(p.name)\",\"\(p.totalProjectTimeString)\"\n"
+            for r in p.noteRows {
+                txt += "\(r.giorno),\"\(r.orari)\",\"\(r.totalTimeString)\",\"\(r.note)\"\n"
+            }
+            txt += "\n"
+        }
+        // Backup projects in user‐defined order
+        txt += "=== Mensilità Passate ===\n"
+        for p in displayedBackupProjects() {
             txt += "\"\(p.name)\",\"\(p.totalProjectTimeString)\"\n"
             for r in p.noteRows {
                 txt += "\(r.giorno),\"\(r.orari)\",\"\(r.totalTimeString)\",\"\(r.note)\"\n"
@@ -528,7 +553,8 @@ class ProjectManager: ObservableObject {
         var list: [Project] = []
         list.append(contentsOf: projects.filter { $0.labelID == nil })
         for label in labels {
-            list.append(contentsOf: projects.filter { $0.labelID == label.id })
+            list.append(contentsOf: projects.filter {
+              $0.labelID == label.id })
         }
         return list
     }
@@ -793,8 +819,9 @@ struct ProjectRowView: View {
                 }
             }) {
                 HStack {
+                    // ** Smaller font here **
                     Text(project.name)
-                        .font(.title3)
+                       // .font(.headline)
                     Spacer()
                 }
                 .padding(.vertical, 8)
@@ -878,10 +905,8 @@ struct LabelHeaderView: View {
                 Button(action: {
                     if isBackup {
                         if projectManager.lockedBackupLabelID == label.id {
-                            // unlocking same: just clear, do NOT change currentProject
                             projectManager.lockedBackupLabelID = nil
                         } else {
-                            // locking new: select its first project
                             projectManager.lockedBackupLabelID = label.id
                             if let first = projectManager.backupProjects.first(where: { $0.labelID == label.id }) {
                                 projectManager.currentProject = first
@@ -889,10 +914,8 @@ struct LabelHeaderView: View {
                         }
                     } else {
                         if projectManager.lockedLabelID == label.id {
-                            // unlocking same: just clear, do NOT change currentProject
                             projectManager.lockedLabelID = nil
                         } else {
-                            // locking new:
                             projectManager.lockedLabelID = label.id
                             if let first = projectManager.projects.first(where: { $0.labelID == label.id }) {
                                 projectManager.currentProject = first
@@ -1259,14 +1282,12 @@ struct NoteView: View {
                             }
                             .foregroundColor(.black)
                         }
-                        Text(project.name)
+                        Text("\(project.name): \(project.totalProjectTimeString)")
                             .font(.title3)
                             .bold()
                             .underline(true, color: projectNameColor)
                             .foregroundColor(.black)
-                        Text("Tot Monte Ore: \(project.totalProjectTimeString)")
-                            .font(.body)
-                            .bold()
+
                     }
                     Spacer()
                     if editMode {
@@ -1274,12 +1295,12 @@ struct NoteView: View {
                             Button(action: {
                                 var rows = editedRows.filter {
                                     !(
-                                      $0.giorno.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
-                                      && $0.orari.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
-                                      && $0.note.trimmingCharacters(in:
-                                        .whitespaces).isEmpty
+                                      $0.giorno.trimmingCharacters(
+                                        in: .whitespaces).isEmpty
+                                      && $0.orari.trimmingCharacters(
+                                        in: .whitespaces).isEmpty
+                                      && $0.note.trimmingCharacters(
+                                        in: .whitespaces).isEmpty
                                     )
                                 }
                                 rows.sort {
@@ -1413,99 +1434,139 @@ struct ComeFunzionaSheetView: View {
     var onDismiss: ()->Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Benvenuto in MonteOre!")
-                    .font(.largeTitle)
-                    .bold()
-                    .padding(.bottom)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Titolo principale
+                    Text("Monte Ore: Scala le tue ore verso la vetta")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .padding(.bottom, 8)
 
-                Group {
-                    Text("🔹 Panoramica Generale").font(.headline)
-                    Text("""
-                    MonteOre è un tracker di tempo semplice e potente:
-                    • Avvia/ferma il timer col grande pulsante nero.
-                    • Ogni sessione viene salvata come “riga” con giorno, orari e note.
-                    • Un’archiviazione mensile automatica sposta i dati nel backup.
-                    """)
-                }
+                    // 🔹 Panoramica Generale
+                    Group {
+                        Text("🔹 Vie del Tempo")
+                            .font(.headline)
+                        Text("""
+                        MonteOre è un traccia tempo semplice e potente:
+                        • Premi il grande pulsante scuro per partire o fermarti come al segnale di partenza in alta quota.
+                        • Ogni riga rappresenta una scalata: un giorno, con orari e note che rimangono registrati.
+                        • Al termine di ogni mese, i tuoi dati vengono archiviati come in un rifugio sicuro.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
 
-                Group {
-                    Text("🔹 Progetti e Backup Mensili").font(.headline)
-                    Text("""
-                    • Nella sezione “Gestione Progetti” trovi i progetti attivi e i backup mensili.
-                    • Puoi rinominare, eliminare e riordinare entrambi i gruppi.
-                    • I backup mensili sono di sola lettura: il timer non si attiva su di essi.
-                    • Drag & drop per riordinare: l’ordine viene salvato e rispettato ovunque.
-                    """)
-                }
+                    // 🔹 Progetti e Backup Mensili
+                    Group {
+                        Text("🔹 Rifugi Mensili e Campo Base")
+                            .font(.headline)
 
-                Group {
-                    Text("🔹 Etichette").font(.headline)
-                    Text("""
-                    • Usa le etichette per raggruppare progetti per categoria.
-                    • Assegna o cambia etichetta cliccando su “Etichetta”.
-                    • Tieni premuto “Ordina” per riordinare le etichette.
-                    • Etichetta vuota non può rimanere bloccata: il lucchetto scompare automaticamente.
-                    """)
-                }
+                        
+                        Text("""
+                        • In Gestione Progetti trovi i tuoi percorsi attivi e i rifugi dei mesi passati: i progetti correnti e quelli archiviati nelle Mensilità Passate.
+                        • Rinomina, elimina o riordina i tuoi itinerari con un semplice trascinamento.
+                        • I rifugi passati sono solo di osservazione: il timer non si attiva al loro interno.
+                        • L’ordine scelto diventa la tua mappa, sempre rispettata.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
 
-                Group {
-                    Text("🔹 Navigazione Progetti").font(.headline)
-                    Text("""
-                    • Il pulsante giallo con frecce cicla avanti/indietro tra i progetti ordinati.
-                    • Se stai visualizzando un backup, appare al centro il pulsante blu “Torna ai progetti correnti”.
-                    • Il ciclo riflette sempre l’ordine definito in “Gestione Progetti”.
-                    """)
-                }
+                    // 🔹 Etichette
+                    Group {
+                        Text("🔹 Sentieri di Etichette")
+                            .font(.headline)
+                        
+                        Text("""
+                        • Assegna un’etichetta per tracciare i tuoi percorsi secondo categorie.
+                        • Tocca ‘Etichetta’ per applicarla o cambiarla in base al tuo itinerario.
+                        • Tocca ‘Ordina’ o trascina i progetti per riorganizzare i tuoi sentieri tematici.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
 
-                Group {
-                    Text("🔹 Import/Export").font(.headline)
-                    Text("""
-                    • “Condividi Monte Ore” ti permette di esportare in JSON o CSV.
-                    • Importa un backup via JSON: tutti i dati correnti vengono sovrascritti.
-                    • Conferma sempre l’import con il dialog “Sovrascrivere tutto?”.
-                    """)
-                }
+                    // 🔹 Navigazione Progetti
+                    Group {
+                        Text("🔹 Orientamento tra Progetti")
+                            .font(.headline)
 
-                Group {
-                    Text("🔹 Modifica Note e Righe").font(.headline)
-                    Text("""
-                    • Clicca “Modifica” nella vista del progetto per cambiare le righe.
-                    • Aggiungi righe vuote con il +, elimina righe totalmente vuote su Salva.
-                    • Se cambia la data, le righe vengono riordinate cronologicamente.
-                    """)
-                }
+                        Text("""
+                        • Il pulsante giallo con le frecce funge da bussola: spostati avanti e indietro tra i percorsi.
+                        • Se esplori un rifugio, il pulsante nero lascerà posto ad una scorciatoia per tornare ai percorsi attivi.
+                        • Il flusso segue sempre la mappa definita in Gestione Progetti.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
 
-                Group {
-                    Text("🔹 Buone Pratiche").font(.headline)
-                    Text("""
-                    • Denomina i progetti in modo conciso, es. “Excel”, e usa le etichette per il contesto.
-                    • Aggiungi l’emoji ✅ nelle note per marcare ore già registrate altrove.
-                    • Non inserire mese/anno nel titolo: MonteOre gestisce automaticamente i backup.
-                    """)
+                    // 🔹 Import/Export
+                    Group {
+                        Text("🔹 Passaggi di Importazione ed Esportazione")
+                            .font(.headline)
+
+                        Text("""
+                        • Tocca ‘Condividi MonteOre’ per esportare il tuo cammino in JSON (per Backup della presente app) o CSV (per spostare il monte orario su Excel).
+                        • Entrambi i file includono anche i percorsi dei mesi trascorsi (rifugi), ordinati secondo la tua bussola.
+                        • Importa un backup in JSON: ATTENZIONE, tutti i dati correnti saranno sovrascritti.
+                        • Al prompt ‘Sovrascrivere tutto?’, conferma per completare l’operazione.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
+
+                    // 🔹 Modifica Note e Righe
+                    Group {
+                        Text("🔹 Modifica e Tracce")
+                            .font(.headline)
+                                
+                        Text("""
+                        • Tocca ‘Modifica’ nella vista del progetto per aggiornare le tue tracce (i tuoi orari).
+                        • Se necessario aggiungi nuove righe con ‘+’; le righe vuote vengono rimosse al salvataggio.
+                        • Cambiando la data, le righe si riordinano secondo la sequenza cronologica.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
+
+                    // 🔹 Buone Pratiche
+                    Group {
+                        Text("🔹 Consigli di Alpinista")
+                            .font(.headline)
+                        Text("""
+                        • Dai nomi brevi ai tuoi percorsi (es. ‘Excel’ o 'Riunioni' o 'Giardinaggio') e usa le etichette per il contesto (es. 'Lavoro' o 'Passioni'.
+                        • Potresti aggiungere l’emoji ✅ nelle note a destra per segnalare i giorni già annotati altrove (come registri aziendali).
+                        • Non inserire mese o anno nel titolo: MonteOre organizza automaticamente i backup.
+                        
+
+
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
                 }
+                .padding(24)
+                .background(.regularMaterial)                        // Sfondo “vetroso” moderno
+                .cornerRadius(16)                                    // Angoli arrotondati
+                .shadow(color: Color.black.opacity(0.1), radius: 8)  // Ombra leggera
+                .padding(.horizontal)
+                .padding(.top)
             }
-            .padding()
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .overlay(
+                Button(action: onDismiss) {
+                    Text("Chiudi il Campo Base")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)          // altezza fissa più bassa
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)               // dimensione piccola
+                .padding(.horizontal)
+                .padding(.bottom, 10),              // ridotto anche il padding inferiore
+                alignment: .bottom
+            )
+
         }
-        .background(Color.white)
-        .cornerRadius(12)
-        .padding()
-        .overlay(
-            Button(action: { onDismiss() }) {
-                Text("Chiudi")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.green)
-                    .cornerRadius(8)
-            }
-            .contentShape(Rectangle())
-            .padding(.horizontal),
-            alignment: .bottom
-        )
-    }
 }
 
 // MARK: - ProjectManagerView
@@ -1798,8 +1859,8 @@ struct ProjectManagerView: View {
                             projectManager.saveBackupOrder()
                             projectManager.saveBackupProjects()
                             projectManager.labels         = pending.labels
-                            projectManager.lockedLabelID          = pending.lockedLabelID.flatMap(UUID.init)
-                            projectManager.lockedBackupLabelID    = pending.lockedBackupLabelID.flatMap(UUID.init)
+                            projectManager.lockedLabelID       = pending.lockedLabelID.flatMap(UUID.init)
+                            projectManager.lockedBackupLabelID = pending.lockedBackupLabelID.flatMap(UUID.init)
                             projectManager.currentProject = projectManager.projects.first
                             projectManager.saveLabels()
                             pendingImport = nil
@@ -1973,39 +2034,65 @@ struct ContentView: View {
                         }
                     }
 
-                    // Pigia il tempo & Torna ai progetti correnti
-                    ZStack {
-                        Button(action: { mainButtonTapped() }) {
-                            Text("Pigia il tempo")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(
-                                  width: isLand ? 100 : 140,
-                                  height: isLand ? 100 : 140)
-                                .background(Circle().fill(Color.black))
-                        }
-                        .disabled(isBackup || projectManager.currentProject == nil)
-
-                        if isBackup {
+                    // —— NEW: lock button + Pigia/Torna ——
+                    HStack(spacing: 20) {
+                        // unlock button if showing a locked label (and only if labelled)
+                        if let cur = projectManager.currentProject,
+                           let lid = cur.labelID,
+                           (projectManager.lockedLabelID == lid
+                            || projectManager.lockedBackupLabelID == lid)
+                        {
                             Button(action: {
-                                if let lockedC = projectManager.lockedLabelID,
-                                   let first = projectManager.projects.first(where: {
-                                     $0.labelID == lockedC }) {
-                                    projectManager.currentProject = first
-                                } else {
-                                    projectManager.currentProject = projectManager.projects.first
+                                if projectManager.lockedLabelID == lid {
+                                    projectManager.lockedLabelID = nil
                                 }
-                                projectManager.lockedBackupLabelID = nil
+                                if projectManager.lockedBackupLabelID == lid {
+                                    projectManager.lockedBackupLabelID = nil
+                                }
+                                projectManager.cleanupEmptyLock()
                             }) {
-                                Text("Torna ai progetti correnti")
-                                    .multilineTextAlignment(.center)
+                                Image(systemName: "lock.fill")
+                                    .font(.title)
                                     .foregroundColor(.black)
-                                    .frame(
-                                      width: isLand ? 100 : 140,
-                                      height: isLand ? 100 : 140)
-                                    .background(Circle().fill(Color(hex: "#54c0ff")))
+                                    .frame(width: isLand ? 50 : 70,
+                                           height: isLand ? 50 : 70)
+                                    .background(Circle().fill(Color.white))
                             }
                             .contentShape(Rectangle())
+                        }
+
+                        ZStack {
+                            Button(action: { mainButtonTapped() }) {
+                                Text("Pigia il tempo")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: isLand ? 100 : 140,
+                                           height: isLand ? 100 : 140)
+                                    .background(Circle().fill(Color.black))
+                            }
+                            .disabled(isBackup || projectManager.currentProject == nil)
+
+                            if isBackup {
+                                Button(action: {
+                                    if let lockedC = projectManager.lockedLabelID,
+                                       let first = projectManager.projects.first(
+                                         where: { $0.labelID == lockedC })
+                                    {
+                                        projectManager.currentProject = first
+                                    } else {
+                                        projectManager.currentProject = projectManager.projects.first
+                                    }
+                                    projectManager.lockedBackupLabelID = nil
+                                }) {
+                                    Text("Torna ai progetti correnti")
+                                        .multilineTextAlignment(.center)
+                                        .foregroundColor(.black)
+                                        .frame(width: isLand ? 100 : 140,
+                                               height: isLand ? 100 : 140)
+                                        .background(Circle().fill(Color(hex: "#54c0ff")))
+                                }
+                                .contentShape(Rectangle())
+                            }
                         }
                     }
 
@@ -2016,9 +2103,8 @@ struct ContentView: View {
                                 .font(.headline)
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.black)
-                                .frame(
-                                  width: isLand ? 90 : 140,
-                                  height: isLand ? 100 : 140)
+                                .frame(width: isLand ? 90 : 140,
+                                       height: isLand ? 100 : 140)
                                 .background(Circle().fill(Color.white))
                                 .overlay(
                                   Circle().stroke(Color.black, lineWidth: 2))
@@ -2030,14 +2116,12 @@ struct ContentView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.yellow)
-                                .frame(
-                                  width: isLand ? 90 : 140,
-                                  height: isLand ? 90 : 140)
+                                .frame(width: isLand ? 90 : 140,
+                                       height: isLand ? 90 : 140)
                                 .overlay(
                                   Rectangle()
-                                    .frame(
-                                      width: isLand ? 90 : 140,
-                                      height: 1),
+                                    .frame(width: isLand ? 90 : 140,
+                                           height: 1),
                                   alignment: .center
                                 )
 
@@ -2063,6 +2147,10 @@ struct ContentView: View {
                                     .padding(.bottom, 16)
                             }
                         }
+                        // ** slight right shift for perfect symmetry **
+                        .offset(x: 30)
+                        .overlay(
+                          Circle().stroke(Color.black, lineWidth: 2).offset(x: 30))
                     }
                     .padding(.horizontal, isLand ? 10 : 30)
                     .padding(.bottom, isLand ? 0 : 30)
