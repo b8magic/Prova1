@@ -1437,27 +1437,31 @@ struct ComeFunzionaSheetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Titolo principale
-                    Text("Monte Ore: Scala le tue ore verso la vetta")
+                    Text("Monte Ore")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .padding(.bottom, 8)
 
-                    // 🔹 Panoramica Generale
+                    // 🏔️ Panoramica Generale
                     Group {
-                        Text("🔹 Vie del Tempo")
-                            .font(.headline)
                         Text("""
-                        MonteOre è un traccia tempo semplice e potente:
-                        • Premi il grande pulsante scuro per partire o fermarti come al segnale di partenza in alta quota.
-                        • Ogni riga rappresenta una scalata: un giorno, con orari e note che rimangono registrati.
-                        • Al termine di ogni mese, i tuoi dati vengono archiviati come in un rifugio sicuro.
+                        Al fianco di colui che, inerpicandosi su di sentieri ombrosi o assolati, smarrisce sovente la traccia del tempo.
+                        🏔️ Vie del Tempo
+                        """)
+                            .font(.headline)
+                        
+                        Text("""
+                        MonteOre è un traccia-tempo. Strumento tanto intuitivo quanto potente:
+                        • Pigia il grande pulsante scuro per avviare o fermare l'orologio, sia che tu sia di partenza a valle che di ripartenza in quota.
+                        • Ogni riga rappresenta la scalata del giorno in corso, con orari tracciati e un taccuino sulla destra per le note.
+                        • Al principio di ogni nuovo mese, i tuoi dati vengono archiviati nei rifugi.
                         """)
                             .font(.body)
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Progetti e Backup Mensili
+                    // 🏔️ Progetti e Backup Mensili
                     Group {
-                        Text("🔹 Rifugi Mensili e Campo Base")
+                        Text("🏔️ Rifugi Mensili e Campo Base")
                             .font(.headline)
 
                         
@@ -1471,9 +1475,9 @@ struct ComeFunzionaSheetView: View {
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Etichette
+                    // 🏔️ Etichette
                     Group {
-                        Text("🔹 Sentieri di Etichette")
+                        Text("🏔️ Sentieri di Etichette")
                             .font(.headline)
                         
                         Text("""
@@ -1485,9 +1489,9 @@ struct ComeFunzionaSheetView: View {
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Navigazione Progetti
+                    // 🏔️ Navigazione Progetti
                     Group {
-                        Text("🔹 Orientamento tra Progetti")
+                        Text("🏔️ Orientamento tra Progetti")
                             .font(.headline)
 
                         Text("""
@@ -1499,9 +1503,9 @@ struct ComeFunzionaSheetView: View {
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Import/Export
+                    // 🏔️ Import/Export
                     Group {
-                        Text("🔹 Passaggi di Importazione ed Esportazione")
+                        Text("🏔️ Passaggi di Importazione ed Esportazione")
                             .font(.headline)
 
                         Text("""
@@ -1514,9 +1518,9 @@ struct ComeFunzionaSheetView: View {
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Modifica Note e Righe
+                    // 🏔️ Modifica Note e Righe
                     Group {
-                        Text("🔹 Modifica e Tracce")
+                        Text("🏔️ Modifica e Tracce")
                             .font(.headline)
                                 
                         Text("""
@@ -1528,12 +1532,12 @@ struct ComeFunzionaSheetView: View {
                             .lineSpacing(4)
                     }
 
-                    // 🔹 Buone Pratiche
+                    // 🏔️ Buone Pratiche
                     Group {
-                        Text("🔹 Consigli di Alpinista")
+                        Text("🏔️ Consigli di Alpinista")
                             .font(.headline)
                         Text("""
-                        • Dai nomi brevi ai tuoi percorsi (es. ‘Excel’ o 'Riunioni' o 'Giardinaggio') e usa le etichette per il contesto (es. 'Lavoro' o 'Passioni'.
+                        • Assegna nomi brevi ai tuoi percorsi (es. ‘Excel’ o 'Riunioni' o 'Giardinaggio') e usa le etichette per il contesto (es. 'Lavoro' o 'Passioni').
                         • Potresti aggiungere l’emoji ✅ nelle note a destra per segnalare i giorni già annotati altrove (come registri aziendali).
                         • Non inserire mese o anno nel titolo: MonteOre organizza automaticamente i backup.
                         
