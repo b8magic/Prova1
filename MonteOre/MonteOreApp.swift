@@ -1445,13 +1445,14 @@ struct ComeFunzionaSheetView: View {
                     Group {
                         Text("""
                         Al fianco di colui che, inerpicandosi su di sentieri ombrosi o assolati, smarrisce sovente la traccia del tempo.
+                        
                         🏔️ Vie del Tempo
                         """)
                             .font(.headline)
                         
                         Text("""
                         MonteOre è un traccia-tempo. Strumento tanto intuitivo quanto potente:
-                        • Pigia il grande pulsante scuro per avviare o fermare l'orologio, sia che tu sia di partenza a valle che di ripartenza in quota.
+                        • Pigia il grande pulsante scuro per avviare o fermare l'orologio, sia in partenza a valle che dopo una sosta in quota.
                         • Ogni riga rappresenta la scalata del giorno in corso, con orari tracciati e un taccuino sulla destra per le note.
                         • Al principio di ogni nuovo mese, i tuoi dati vengono archiviati nei rifugi.
                         """)
@@ -1934,11 +1935,11 @@ struct NoNotesPromptView: View {
         VStack(spacing: 20) {
             Text("Nessun progetto attivo")
                 .font(.title).bold()
-            Text("Per iniziare, crea o seleziona un progetto.")
+            Text("Per iniziare crea un progetto.")
                 .multilineTextAlignment(.center)
             HStack(spacing: 20) {
                 Button(action: onOk) {
-                    Text("Crea/Seleziona Progetto")
+                    Text("Crea Progetto")
                         .padding()
                         .background(Color.blue)
                         .foregroundColor(.white)
@@ -1946,14 +1947,14 @@ struct NoNotesPromptView: View {
                 }
                 .contentShape(Rectangle())
 
-                Button(action: onNonCHoSbatti) {
+                /*Button(action: onNonCHoSbatti) {
                     Text("Non CHo Sbatti")
                         .padding()
                         .background(Color.orange)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
-                .contentShape(Rectangle())
+                .contentShape(Rectangle())*/
             }
         }
         .padding()
