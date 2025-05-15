@@ -1,3 +1,4 @@
+//4.3.4 TOP //salva export csv divisi in etichette - estetica bella
 import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
@@ -523,29 +524,62 @@ class ProjectManager: ObservableObject {
     }
 
     /// CSV export now uses displayed order and is named MonteoreCSV.txt
-    func getCSVExportURL() -> URL? {
+    /// Genera un file CSV formattato secondo le specifiche:
+    /// — riga di intestazione: NomeProgetto,,,,TotMonteOrarioProgetto
+    /// — righe successive: Data,TotMonteOrarioGiorno,Orari,Note
+    /// Se `labelFilter` è non-nil, esporta solo i progetti (correnti e mensilità passate)
+    /// che hanno labelID == labelFilter.
+    func getCSVExportURL(labelFilter: UUID? = nil) -> URL? {
         let url = FileManager.default.temporaryDirectory
-                  .appendingPathComponent("MonteoreCSV.txt")
+                   .appendingPathComponent("MonteoreCSV.txt")
         var txt = ""
-        // Current projects
-        for p in projects {
-            txt += "\"\(p.name)\",\"\(p.totalProjectTimeString)\"\n"
+
+        // — Progetti Correnti
+        let current = labelFilter == nil
+            ? projects
+            : projects.filter { $0.labelID == labelFilter }
+        for p in current {
+            // 1) intestazione progetto
+            let projectName = p.name.replacingOccurrences(of: ",", with: " ")
+            txt += "\(projectName),\(p.totalProjectTimeString)\n"
+
+            // 2) righe dei giorni
             for r in p.noteRows {
-                txt += "\(r.giorno),\"\(r.orari)\",\"\(r.totalTimeString)\",\"\(r.note)\"\n"
+                let day      = r.giorno
+                let total    = r.totalTimeString
+                let intervals = r.orari
+                // sostituisco virgole in note con trattini
+                let noteSafe = r.note.replacingOccurrences(of: ",", with: "-")
+                txt += "\(day),,\(total),\(intervals),\(noteSafe)\n"
             }
             txt += "\n"
         }
-        // Backup projects in user‐defined order
+
+        // — Mensilità Passate
         txt += "=== Mensilità Passate ===\n"
-        for p in displayedBackupProjects() {
-            txt += "\"\(p.name)\",\"\(p.totalProjectTimeString)\"\n"
+        let backups = labelFilter == nil
+            ? displayedBackupProjects()
+            : displayedBackupProjects().filter { $0.labelID == labelFilter }
+        for p in backups {
+            let projectName = p.name.replacingOccurrences(of: ",", with: " ")
+            txt += "\(projectName),\(p.totalProjectTimeString)\n"
             for r in p.noteRows {
-                txt += "\(r.giorno),\"\(r.orari)\",\"\(r.totalTimeString)\",\"\(r.note)\"\n"
+                let day       = r.giorno
+                let total     = r.totalTimeString
+                let intervals = r.orari
+                let noteSafe  = r.note.replacingOccurrences(of: ",", with: "-")
+                txt += "\(day),,\(total),\(intervals),\(noteSafe)\n"
             }
             txt += "\n"
         }
-        try? txt.write(to: url, atomically: true, encoding: .utf8)
-        return url
+
+        do {
+            try txt.write(to: url, atomically: true, encoding: .utf8)
+            return url
+        } catch {
+            print("Errore esportazione CSV:", error)
+            return nil
+        }
     }
 
     // MARK: Display Helpers
@@ -1444,17 +1478,34 @@ struct ComeFunzionaSheetView: View {
                     // 🏔️ Panoramica Generale
                     Group {
                         Text("""
-                        Al fianco di colui che, inerpicandosi su di sentieri ombrosi o assolati, smarrisce sovente la traccia del tempo.
+                        Al fianco di colui che, inerpicatosi su di sentieri ombrosi o assolati, smarrisce sovente la traccia del tempo.
                         
-                        🏔️ Vie del Tempo
+                        🏔️ Vie della Mappa del Tempo
                         """)
                             .font(.headline)
                         
                         Text("""
                         MonteOre è un traccia-tempo. Strumento tanto intuitivo quanto potente:
-                        • Pigia il grande pulsante scuro per avviare o fermare l'orologio, sia in partenza a valle che dopo una sosta in quota.
-                        • Ogni riga rappresenta la scalata del giorno in corso, con orari tracciati e un taccuino sulla destra per le note.
-                        • Al principio di ogni nuovo mese, i tuoi dati vengono archiviati nei rifugi.
+                        • Pigia il grande pulsante scuro per avviare o frenare l'orologio, come in partenza a valle o dopo una sosta in quota.
+                        • Ogni riga rappresenta la scalata del giorno corrente, con orari tracciati e un taccuino sulla destra per le note. 
+                        • Un percorso corrente (determinato dal trattino '-' sospeso) è tinto di giallo (così come il verde-oro che spunta fra i rami al di là del sentiero, in una bella giornata vissuta, di sole alto e luminoso).
+                        • Al principio di ogni nuovo mese, le tracce dei percorsi vengono archiviate automaticamente nei quaderni dei rifugi (le Mensilità Passate). Perciò non inserire mese o anno nel titolo: Monte Ore organizza automaticamente gli archivi.
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
+                    
+                    // 🏔️ Modifica Note e Righe
+                    Group {
+                        Text("🏔️ Mentre cammini")
+                            .font(.headline)
+                                
+                        Text("""
+                        • Tocca ‘Modifica’ nella vista del progetto per aggiornare le tracce del tempo e gli appunti.
+                        • Le righe svuotate interamente vengono rimosse al salvataggio.
+                        • Se necessario aggiungi nuove righe con ‘+’.
+                        • Cambiando la data, le righe si riordinano secondo la sequenza cronologica.
+                        • Se un'attività eccede la mezzanotte, al momento di pigiarne il termine col pulsante scuro verrebbe creato un nuovo giorno: modifica invece le tracce del tempo inserendo un termine di fine orario che fuoriesca le 24. Ad esempio, se l'attività si è conclusa all'1:29, inserisci: -25:29.
                         """)
                             .font(.body)
                             .lineSpacing(4)
@@ -1462,15 +1513,16 @@ struct ComeFunzionaSheetView: View {
 
                     // 🏔️ Progetti e Backup Mensili
                     Group {
-                        Text("🏔️ Rifugi Mensili e Campo Base")
+                        Text("🏔️ Di sera (Gestione Progetti)")
                             .font(.headline)
 
                         
                         Text("""
-                        • In Gestione Progetti trovi i tuoi percorsi attivi e i rifugi dei mesi passati: i progetti correnti e quelli archiviati nelle Mensilità Passate.
+                        • I Progetti Correnti rappresentano i percorsi che attraversi ogni giorno, le Mensilità Passate i ricordi rievocati davanti al focolare d'un rifugio.
+                        • In Gestione Progetti trovi i progetti correnti e quelli archiviati nelle Mensilità Passate.
                         • Rinomina, elimina o riordina i tuoi itinerari con un semplice trascinamento.
-                        • I rifugi passati sono solo di osservazione: il timer non si attiva al loro interno.
-                        • L’ordine scelto diventa la tua mappa, sempre rispettata.
+                        • L’ordine eletto determina la mappa dei percorsi, sempre rispettata.
+                        • I progetti archiviati sono solo di osservazione: il cronometro non si attiva al loro interno.
                         """)
                             .font(.body)
                             .lineSpacing(4)
@@ -1478,13 +1530,13 @@ struct ComeFunzionaSheetView: View {
 
                     // 🏔️ Etichette
                     Group {
-                        Text("🏔️ Sentieri di Etichette")
+                        Text("🏔️ Etichette: riordina la mappa dei sentieri secondo colore")
                             .font(.headline)
                         
                         Text("""
-                        • Assegna un’etichetta per tracciare i tuoi percorsi secondo categorie.
+                        • Crea e assegna un’etichetta per cartografare i tuoi percorsi per categoria.
                         • Tocca ‘Etichetta’ per applicarla o cambiarla in base al tuo itinerario.
-                        • Tocca ‘Ordina’ o trascina i progetti per riorganizzare i tuoi sentieri tematici.
+                        • Nella sala 'Etichette', effettua un semplice trascinamento per riorganizzare i tuoi sentieri tematici.
                         """)
                             .font(.body)
                             .lineSpacing(4)
@@ -1497,37 +1549,8 @@ struct ComeFunzionaSheetView: View {
 
                         Text("""
                         • Il pulsante giallo con le frecce funge da bussola: spostati avanti e indietro tra i percorsi.
-                        • Se esplori un rifugio, il pulsante nero lascerà posto ad una scorciatoia per tornare ai percorsi attivi.
+                        • Se esplori il rifugio (coi registri delle Mensilità Passate), il cronometro lascerà posto ad una scorciatoia per tornare ai percorsi attivi.
                         • Il flusso segue sempre la mappa definita in Gestione Progetti.
-                        """)
-                            .font(.body)
-                            .lineSpacing(4)
-                    }
-
-                    // 🏔️ Import/Export
-                    Group {
-                        Text("🏔️ Passaggi di Importazione ed Esportazione")
-                            .font(.headline)
-
-                        Text("""
-                        • Tocca ‘Condividi MonteOre’ per esportare il tuo cammino in JSON (per Backup della presente app) o CSV (per spostare il monte orario su Excel).
-                        • Entrambi i file includono anche i percorsi dei mesi trascorsi (rifugi), ordinati secondo la tua bussola.
-                        • Importa un backup in JSON: ATTENZIONE, tutti i dati correnti saranno sovrascritti.
-                        • Al prompt ‘Sovrascrivere tutto?’, conferma per completare l’operazione.
-                        """)
-                            .font(.body)
-                            .lineSpacing(4)
-                    }
-
-                    // 🏔️ Modifica Note e Righe
-                    Group {
-                        Text("🏔️ Modifica e Tracce")
-                            .font(.headline)
-                                
-                        Text("""
-                        • Tocca ‘Modifica’ nella vista del progetto per aggiornare le tue tracce (i tuoi orari).
-                        • Se necessario aggiungi nuove righe con ‘+’; le righe vuote vengono rimosse al salvataggio.
-                        • Cambiando la data, le righe si riordinano secondo la sequenza cronologica.
                         """)
                             .font(.body)
                             .lineSpacing(4)
@@ -1538,16 +1561,31 @@ struct ComeFunzionaSheetView: View {
                         Text("🏔️ Consigli di Alpinista")
                             .font(.headline)
                         Text("""
-                        • Assegna nomi brevi ai tuoi percorsi (es. ‘Excel’ o 'Riunioni' o 'Giardinaggio') e usa le etichette per il contesto (es. 'Lavoro' o 'Passioni').
-                        • Potresti aggiungere l’emoji ✅ nelle note a destra per segnalare i giorni già annotati altrove (come registri aziendali).
-                        • Non inserire mese o anno nel titolo: MonteOre organizza automaticamente i backup.
-                        
-
-
+                        • Assegna nomi brevi ai tuoi percorsi (es. ‘Excel’ o 'Riunioni' o 'Giardinaggio') e usa le etichette per il contesto (es. 'Lavoro', o 'Passione X', o 'MacroProgetto Y'). O fai te: l'uso dell'app è flessibile e adattabile alle proprie esigenze.
+                        • Potresti aggiungere la spunta ✅ nelle note a destra per segnalare i giorni già annotati altrove (come registri aziendali).
                         """)
                             .font(.body)
                             .lineSpacing(4)
                     }
+                    
+                    // 🏔️ Import/Export
+                    Group {
+                        Text("🏔️ Passaggi di Importazione ed Esportazione")
+                            .font(.headline)
+
+                        Text("""
+                        • Tocca ‘Condividi MonteOre’ per esportare il tuo cammino in JSON (per Backup omnicomprensivo della presente app) o CSV (per spostare il monte orario su Excel).
+                        • Entrambi i file includono anche sia i progetti correnti sia quelli trascorsi, ordinati secondo la mappa.
+                        • Importa un backup in JSON: ATTENZIONE, tutti i dati correnti saranno sovrascritti.
+                        • Al prompt ‘Sovrascrivere tutto?’, conferma per completare l’operazione.
+                        
+                        
+                        
+                        """)
+                            .font(.body)
+                            .lineSpacing(4)
+                    }
+                    
                 }
                 .padding(24)
                 .background(.regularMaterial)                        // Sfondo “vetroso” moderno
@@ -1574,7 +1612,71 @@ struct ComeFunzionaSheetView: View {
         }
 }
 
-// MARK: - ProjectManagerView
+struct CSVExportOptionsView: View {
+    @ObservedObject var projectManager: ProjectManager
+    let onExport: (_ labelID: UUID?) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationView {
+            HStack(spacing: 0) {
+                // ——— Esporta tutto ———
+                VStack {
+                    Button(action: { onExport(nil) }) {
+                        Text("Esporta Tutto")
+                            .font(.title2)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 8).strokeBorder())
+                    }
+                    Spacer()
+                }
+                .frame(width: 150)
+                
+                Divider()
+                
+                // ——— Filtra per etichetta ———
+                VStack(alignment: .leading) {
+                    Text("Filtra per Etichetta")
+                        .font(.headline)
+                        .padding(.bottom, 8)
+                    ScrollView {
+                        ForEach(projectManager.labels) { label in
+                            Button(action: { onExport(label.id) }) {
+                                HStack {
+                                    Circle()
+                                        .fill(Color(hex: label.color))
+                                        .frame(width: 20, height: 20)
+                                    Text(label.title)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 6)
+                            }
+                            Divider()
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Esporta CSV")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annulla") { onCancel() }
+                }
+            }
+        }
+    }
+}
+
+import SwiftUI
+import UniformTypeIdentifiers
+
+// Wrapper Identifiable per il file da esportare
+private struct ExportFile: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
 struct ProjectManagerView: View {
     @ObservedObject var projectManager: ProjectManager
 
@@ -1592,53 +1694,59 @@ struct ProjectManagerView: View {
     @State private var editMode: EditMode = .inactive
     @State private var editingProjects = false
 
+    // — Stati per l’export CSV/JSON —
     @State private var showExportOpts = false
-    @State private var exportURL: URL? = nil
-    @State private var showActivity = false
+    @State private var showCSVExportOptions = false
+    @State private var exportFile: ExportFile? = nil
+    @State private var csvPrewarmed = false
 
     var body: some View {
         NavigationView {
             VStack {
+                // ───────────────── LISTA PROGETTI ─────────────────
                 List {
                     Section(header:
                         Text("Progetti Correnti")
                             .font(.largeTitle).bold()
                             .padding(.top, 10)
                     ) {
-                        let unl = projectManager.projects.filter {
-                            $0.labelID == nil }
+                        let unl = projectManager.projects.filter { $0.labelID == nil }
                         if !unl.isEmpty {
                             ForEach(unl) { p in
                                 ProjectRowView(
-                                  project: p,
-                                  projectManager: projectManager,
-                                  editingProjects: editingProjects)
+                                    project: p,
+                                    projectManager: projectManager,
+                                    editingProjects: editingProjects
+                                )
                             }
                             .onMove { idx, off in
                                 projectManager.moveProjects(
-                                  forLabel: nil,
-                                  indices: idx,
-                                  newOffset: off)
+                                    forLabel: nil,
+                                    indices: idx,
+                                    newOffset: off
+                                )
                             }
                         }
                         ForEach(projectManager.labels) { lab in
                             LabelHeaderView(
-                              label: lab,
-                              projectManager: projectManager)
-                            let grp = projectManager.projects.filter {
-                                $0.labelID == lab.id }
+                                label: lab,
+                                projectManager: projectManager
+                            )
+                            let grp = projectManager.projects.filter { $0.labelID == lab.id }
                             if !grp.isEmpty {
                                 ForEach(grp) { p in
                                     ProjectRowView(
-                                      project: p,
-                                      projectManager: projectManager,
-                                      editingProjects: editingProjects)
+                                        project: p,
+                                        projectManager: projectManager,
+                                        editingProjects: editingProjects
+                                    )
                                 }
                                 .onMove { idx, off in
                                     projectManager.moveProjects(
-                                      forLabel: lab.id,
-                                      indices: idx,
-                                      newOffset: off)
+                                        forLabel: lab.id,
+                                        indices: idx,
+                                        newOffset: off
+                                    )
                                 }
                             }
                         }
@@ -1649,41 +1757,44 @@ struct ProjectManagerView: View {
                             .font(.largeTitle).bold()
                             .padding(.top, 40)
                     ) {
-                        let unl = projectManager.backupProjects.filter {
-                            $0.labelID == nil }
+                        let unl = projectManager.backupProjects.filter { $0.labelID == nil }
                         if !unl.isEmpty {
                             ForEach(unl) { p in
                                 ProjectRowView(
-                                  project: p,
-                                  projectManager: projectManager,
-                                  editingProjects: editingProjects)
+                                    project: p,
+                                    projectManager: projectManager,
+                                    editingProjects: editingProjects
+                                )
                             }
                             .onMove { idx, off in
                                 projectManager.moveBackupProjects(
-                                  forLabel: nil,
-                                  indices: idx,
-                                  newOffset: off)
+                                    forLabel: nil,
+                                    indices: idx,
+                                    newOffset: off
+                                )
                             }
                         }
                         ForEach(projectManager.labels) { lab in
-                            let grp = projectManager.backupProjects.filter {
-                                $0.labelID == lab.id }
+                            let grp = projectManager.backupProjects.filter { $0.labelID == lab.id }
                             if !grp.isEmpty {
                                 LabelHeaderView(
-                                  label: lab,
-                                  projectManager: projectManager,
-                                  isBackup: true)
+                                    label: lab,
+                                    projectManager: projectManager,
+                                    isBackup: true
+                                )
                                 ForEach(grp) { p in
                                     ProjectRowView(
-                                      project: p,
-                                      projectManager: projectManager,
-                                      editingProjects: editingProjects)
+                                        project: p,
+                                        projectManager: projectManager,
+                                        editingProjects: editingProjects
+                                    )
                                 }
                                 .onMove { idx, off in
                                     projectManager.moveBackupProjects(
-                                      forLabel: lab.id,
-                                      indices: idx,
-                                      newOffset: off)
+                                        forLabel: lab.id,
+                                        indices: idx,
+                                        newOffset: off
+                                    )
                                 }
                             }
                         }
@@ -1692,6 +1803,7 @@ struct ProjectManagerView: View {
                 .listStyle(PlainListStyle())
                 .environment(\.editMode, $editMode)
 
+                // ───────────── CREAZIONE PROGETTO & ETICHETTE ─────────────
                 HStack {
                     TextField("Nuovo progetto", text: $newProjectName)
                         .font(.title3)
@@ -1706,8 +1818,8 @@ struct ProjectManagerView: View {
                             .foregroundColor(.green)
                             .padding(8)
                             .overlay(
-                              RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.green, lineWidth: 2)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.green, lineWidth: 2)
                             )
                     }
                     .contentShape(Rectangle())
@@ -1718,14 +1830,15 @@ struct ProjectManagerView: View {
                             .foregroundColor(.red)
                             .padding(8)
                             .overlay(
-                              RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.red, lineWidth: 2)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red, lineWidth: 2)
                             )
                     }
                     .contentShape(Rectangle())
                 }
                 .padding()
 
+                // ───────────── EXPORT / IMPORT ─────────────
                 HStack {
                     Button(action: { showExportOpts = true }) {
                         Text("Condividi Monte Ore")
@@ -1733,8 +1846,8 @@ struct ProjectManagerView: View {
                             .foregroundColor(.purple)
                             .padding()
                             .overlay(
-                              RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.purple, lineWidth: 2)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.purple, lineWidth: 2)
                             )
                     }
                     .contentShape(Rectangle())
@@ -1747,8 +1860,8 @@ struct ProjectManagerView: View {
                             .foregroundColor(.orange)
                             .padding()
                             .overlay(
-                              RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.orange, lineWidth: 2)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange, lineWidth: 2)
                             )
                     }
                     .contentShape(Rectangle())
@@ -1763,7 +1876,7 @@ struct ProjectManagerView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if showHowButton {
                         Button(action: { showHow = true }) {
-                            Text("Come funziona l'app")
+                            Text("Campo Base")
                                 .font(.custom("Permanent Marker", size: 20))
                                 .foregroundColor(.black)
                                 .padding(8)
@@ -1785,50 +1898,74 @@ struct ProjectManagerView: View {
             .sheet(isPresented: $showEtichette) {
                 LabelsManagerView(projectManager: projectManager)
             }
+
+            // ───────────── DIALOG DI SCELTA EXPORT ─────────────
             .confirmationDialog("Esporta Monte Ore",
                                 isPresented: $showExportOpts,
                                 titleVisibility: .visible) {
                 Button("Backup (JSON)") {
-                    exportURL = projectManager.getExportURL()
-                    showActivity = true
+                    if let url = projectManager.getExportURL() {
+                        exportFile = ExportFile(url: url)
+                    }
                 }
                 Button("Esporta CSV monte ore") {
-                    exportURL = projectManager.getCSVExportURL()
-                    showActivity = true
+                    showCSVExportOptions = true
                 }
                 Button("Annulla", role: .cancel) {}
             }
-            .sheet(isPresented: $showActivity) {
-                if let url = exportURL {
-                    ActivityView(activityItems: [url])
-                } else {
-                    Text("Errore nell'esportazione")
-                }
+
+            // ───────────── MODALE DI SCELTA CSV ─────────────
+            .sheet(isPresented: $showCSVExportOptions) {
+                CSVExportOptionsView(
+                    projectManager: projectManager,
+                    onExport: { labelID in
+                        // ➊ pre-warm + cancellazione invisibile
+                        prewarmCSV(labelID)
+                        // ➋ rigenera per l’export vero
+                        if let url = projectManager.getCSVExportURL(labelFilter: labelID) {
+                            exportFile = ExportFile(url: url)
+                        }
+                        showCSVExportOptions = false
+                    },
+                    onCancel: {
+                        showCSVExportOptions = false
+                    }
+                )
             }
+
+            // ───────────── SHEET PER L’ACTIVITYVIEW ─────────────
+            .sheet(item: $exportFile) { file in
+                ActivityView(activityItems: [file.url])
+            }
+
+            // ───────────── IMPORT JSON ─────────────
             .fileImporter(isPresented: $showImport,
                           allowedContentTypes: [UTType.json]) { res in
                 switch res {
                 case .success(let url):
                     guard url.startAccessingSecurityScopedResource() else {
                         importError = AlertError(
-                          message: "Non è possibile accedere al file.")
+                            message: "Non è possibile accedere al file."
+                        )
                         return
                     }
                     defer { url.stopAccessingSecurityScopedResource() }
                     do {
                         let data = try Data(contentsOf: url)
-                        let imp  = try JSONDecoder()
-                                      .decode(ProjectManager.ExportData.self,
-                                              from: data)
+                        let imp = try JSONDecoder()
+                            .decode(ProjectManager.ExportData.self,
+                                    from: data)
                         pendingImport = imp
                         showImportConfirm = true
                     } catch {
                         importError = AlertError(
-                          message: "Errore nell'import: \(error)")
+                            message: "Errore nell'import: \(error)"
+                        )
                     }
                 case .failure(let err):
                     importError = AlertError(
-                      message: "Errore: \(err.localizedDescription)")
+                        message: "Errore: \(err.localizedDescription)"
+                    )
                 }
             }
             .alert(item: $importError) { e in
@@ -1841,18 +1978,18 @@ struct ProjectManagerView: View {
                     ImportConfirmationView(
                         message: "Attenzione: sovrascrivere tutto?",
                         importAction: {
+                            // (stessa logica di import originale)…
                             let docs = FileManager.default
-                                        .urls(for: .documentDirectory,
-                                              in: .userDomainMask)[0]
+                                .urls(for: .documentDirectory,
+                                      in: .userDomainMask)[0]
                             if let files = try? FileManager.default.contentsOfDirectory(
-                                                at: docs,
-                                                includingPropertiesForKeys: nil)
-                            {
+                                at: docs,
+                                includingPropertiesForKeys: nil) {
                                 for file in files {
                                     if file.pathExtension == "json"
-                                       && file.lastPathComponent != projectManager.projectsFileName
-                                       && file.lastPathComponent != "labels.json"
-                                       && file.lastPathComponent != projectManager.backupOrderFileName
+                                        && file.lastPathComponent != projectManager.projectsFileName
+                                        && file.lastPathComponent != "labels.json"
+                                        && file.lastPathComponent != projectManager.backupOrderFileName
                                     {
                                         try? FileManager.default.removeItem(at: file)
                                     }
@@ -1880,15 +2017,30 @@ struct ProjectManagerView: View {
                     Text("Errore: nessun dato da importare.")
                 }
             }
+
             .sheet(isPresented: $showHow, onDismiss: { showHowButton = false }) {
                 ComeFunzionaSheetView { showHow = false }
             }
             .onAppear {
                 NotificationCenter.default.addObserver(
-                  forName: Notification.Name("CycleProjectNotification"),
-                  object: nil, queue: .main) { _ in }
+                    forName: Notification.Name("CycleProjectNotification"),
+                    object: nil, queue: .main) { _ in }
             }
         }
+    }
+
+    // ───────────── PREWARM CSV ─────────────
+    private func prewarmCSV(_ labelID: UUID?) {
+        guard !csvPrewarmed,
+              let tmpURL = projectManager.getCSVExportURL(labelFilter: labelID)
+        else { return }
+        _ = try? tmpURL.resourceValues(forKeys: [
+            .typeIdentifierKey,
+            .contentTypeKey,
+            .isRegularFileKey
+        ])
+        try? FileManager.default.removeItem(at: tmpURL)
+        csvPrewarmed = true
     }
 }
 
@@ -1946,7 +2098,7 @@ struct NoNotesPromptView: View {
                         .cornerRadius(8)
                 }
                 .contentShape(Rectangle())
-
+                
                 /*Button(action: onNonCHoSbatti) {
                     Text("Non CHo Sbatti")
                         .padding()
